@@ -1,0 +1,634 @@
+.workflow-page {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  background: #fcfcfd;
+}
+
+.wf-main {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.wf-surface {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #fcfcfd;
+  cursor: grab;
+  touch-action: none;
+}
+
+.wf-surface.panning {
+  cursor: grabbing;
+}
+
+.wf-surface.dragging {
+  cursor: grabbing;
+}
+
+.wf-grid {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, #e4e4ec 1px, transparent 1.3px);
+  background-repeat: repeat;
+  pointer-events: none;
+}
+
+.wf-links {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.wf-link {
+  fill: none;
+  stroke: #c9c9d3;
+  stroke-width: 1.4;
+  transition: stroke 0.15s ease;
+}
+
+.wf-link.active {
+  stroke: var(--accent);
+  stroke-width: 1.6;
+}
+
+.wf-link.ghost {
+  stroke: var(--accent);
+  stroke-dasharray: 4 4;
+  opacity: 0.85;
+}
+
+.wf-world {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+}
+
+.wf-node {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 9px 11px 0;
+  border: 1px solid #e6e6ec;
+  border-radius: 11px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.04);
+  cursor: grab;
+  user-select: none;
+  transition: box-shadow 0.12s ease, border-color 0.12s ease;
+}
+
+.wf-node:hover {
+  border-color: #d8d8e1;
+  box-shadow: var(--shadow-sm);
+}
+
+.wf-node.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(59, 110, 246, 0.1), var(--shadow-sm);
+}
+
+.wf-node.status-running {
+  border-color: var(--accent-line);
+}
+
+.wf-node.status-done {
+  border-color: #c4e5d1;
+}
+
+.wf-node.status-waiting {
+  border-color: #efdcb6;
+}
+
+.wf-node-top {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.wf-node-glyph {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wf-node-title {
+  font-size: 12.3px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wf-node-sub {
+  margin: 2px 0 0 27px;
+  font-size: 10.5px;
+  line-height: 1.35;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wf-node-foot {
+  margin: auto -11px 0;
+  padding: 4px 11px 5px;
+  border-top: 1px solid #f1f1f5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.wf-node-model {
+  font-family: var(--font-mono);
+  font-size: 10.2px;
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wf-node-state {
+  font-size: 10.2px;
+  color: var(--text-3);
+  flex-shrink: 0;
+}
+
+.wf-node-state.running {
+  color: var(--accent);
+}
+
+.wf-node-state.waiting {
+  color: var(--amber);
+}
+
+.wf-node-state.done {
+  color: var(--green);
+}
+
+.wf-node-state.failed {
+  color: var(--red);
+}
+
+.wf-port {
+  position: absolute;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1.5px solid #cfcfd9;
+  background: #fff;
+  transform: translateY(-50%);
+  opacity: 0;
+  transition: opacity 0.12s ease, border-color 0.12s ease;
+}
+
+.wf-port.in {
+  left: -5px;
+}
+
+.wf-port.out {
+  right: -5px;
+  cursor: crosshair;
+}
+
+.wf-node:hover .wf-port,
+.wf-node.selected .wf-port {
+  opacity: 1;
+}
+
+.wf-port.out:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.wf-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--text-3);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.wf-empty p {
+  margin: 0;
+}
+
+/* —— 节点库 —— */
+.wf-library {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 5;
+  width: 136px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.wf-lib-title {
+  padding: 2px 6px 6px;
+  font-size: 10.8px;
+  color: var(--text-3);
+}
+
+.wf-lib-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 7px;
+  color: var(--text-2);
+  font-size: 12px;
+  text-align: left;
+  cursor: grab;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.wf-lib-item:hover {
+  background: #f5f5f8;
+  color: var(--text);
+}
+
+.wf-lib-hint {
+  padding: 6px 6px 2px;
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--text-3);
+}
+
+/* —— 顶部统计 —— */
+.wf-badges {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 5;
+  display: flex;
+  gap: 6px;
+}
+
+.wf-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: var(--shadow-xs);
+  font-size: 11.3px;
+  color: var(--text-2);
+}
+
+.wf-badge b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* —— 缩放 —— */
+.wf-zoom {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.zoom-btn {
+  width: 26px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: var(--text-2);
+}
+
+.zoom-btn:hover {
+  background: #f2f2f5;
+}
+
+.zoom-value {
+  min-width: 38px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 11.3px;
+  color: var(--text-2);
+}
+
+.zoom-sep {
+  width: 1px;
+  height: 16px;
+  margin: 0 3px;
+  background: var(--line);
+}
+
+.zoom-fit {
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  color: var(--text-2);
+}
+
+.zoom-fit:hover {
+  background: #f2f2f5;
+}
+
+/* —— 底部操作 —— */
+.wf-actions {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.wf-action {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: var(--shadow-xs);
+  color: var(--text-2);
+  font-size: 12.3px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.wf-action:hover {
+  background: #f7f7f9;
+  color: var(--text);
+}
+
+.wf-run {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 14px;
+  border-radius: 9px;
+  background: #2f6feb;
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 500;
+  box-shadow: 0 1px 3px rgba(47, 111, 235, 0.35);
+  transition: background 0.15s ease;
+}
+
+.wf-run:hover:not(:disabled) {
+  background: #2a63d2;
+}
+
+.wf-run:disabled {
+  opacity: 0.72;
+  cursor: default;
+}
+
+.wf-run.approve {
+  background: #1f9d55;
+}
+
+.wf-run.approve:hover {
+  background: #1a8a4a;
+}
+
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: 60px;
+  z-index: 9;
+  transform: translateX(-50%);
+  padding: 7px 13px;
+  border-radius: 999px;
+  background: rgba(27, 27, 31, 0.92);
+  color: #fff;
+  font-size: 12px;
+  box-shadow: var(--shadow-md);
+  animation: toast-in 0.18s ease;
+  white-space: nowrap;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* —— 右侧检查器 —— */
+.wf-inspector {
+  flex-shrink: 0;
+  width: 322px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid var(--line);
+  background: #fff;
+}
+
+.wf-inspector.empty {
+  align-items: center;
+  justify-content: center;
+}
+
+.inspector-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 0 28px;
+  text-align: center;
+  color: var(--text-3);
+}
+
+.inspector-empty p {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.inspector-empty span {
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.inspector-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.inspector-glyph {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.inspector-head-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.inspector-head-text b {
+  font-size: 13.2px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.inspector-head-text span {
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.inspector-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  padding: 14px 16px;
+}
+
+.inspector-foot {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--line);
+  background: #fcfcfd;
+}
+
+.inspector-foot .btn {
+  flex: 1;
+  justify-content: center;
+  height: 32px;
+}
+
+.tool-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.tool-chip {
+  height: 23px;
+  padding: 0 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: #fff;
+  font-family: var(--font-mono);
+  font-size: 10.8px;
+  color: var(--text-2);
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.tool-chip:hover {
+  border-color: #cfcfd8;
+}
+
+.tool-chip.on {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: #2b57cc;
+}
+
+.isolation {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.isolation-option {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  color: var(--text-3);
+  font-size: 11.5px;
+  text-align: left;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.isolation-option:hover {
+  border-color: #cfcfd8;
+}
+
+.isolation-option.on {
+  border-color: #b7e0c6;
+  background: var(--green-soft);
+  color: #146b3a;
+}
+
+.isolation-option.on svg {
+  color: var(--green);
+}
+
+.last-run {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 10px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 8px;
+  color: var(--text-3);
+  font-size: 11.5px;
+}
+
+@media (max-width: 1180px) {
+  .wf-inspector {
+    width: 300px;
+  }
+}

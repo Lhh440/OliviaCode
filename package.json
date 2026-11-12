@@ -1,0 +1,21 @@
+{
+  "name": "oliviacode",
+  "version": "0.3.0",
+  "private": true,
+  "description": "OliviaCode — 本地优先的 AI 编程工作站",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm --workspace @olivia/web run dev",
+    "build:web": "npm --workspace @olivia/web run build",
+    "start": "npm run build:web && electron apps/desktop/main.cjs",
+    "typecheck": "tsc -p apps/web/tsconfig.json",
+    "shot": "electron scripts/capture.cjs"
+  },
+  "devDependencies": {
+    "electron": "33.2.0",
+    "typescript": "5.6.3"
+  }
+}
