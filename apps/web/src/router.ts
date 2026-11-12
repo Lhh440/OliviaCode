@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 
-export type Route = 'chat' | 'workflow' | 'settings';
+export type Route = 'chat' | 'workflow' | 'git' | 'settings';
 
-const ROUTES: Route[] = ['chat', 'workflow', 'settings'];
+const ROUTES: Route[] = ['chat', 'workflow', 'git', 'settings'];
 
 function parse(hash: string): Route {
   const value = hash.replace(/^#\/?/, '').split('?')[0];

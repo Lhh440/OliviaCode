@@ -32,6 +32,10 @@ export interface DiffFile {
   state: 'pending' | 'accepted' | 'rejected' | 'undone';
   /** 真实写入时由主进程给出，用于「撤销这次写入」 */
   snapshotId?: string;
+  /** 逐处接受：对应 apply_patch 的调用 id */
+  callId?: string;
+  /** 逐处接受时，每一条 edits 的预览；界面按这个生成勾选项 */
+  edits?: { index: number; adds: number; dels: number; hunks: DiffHunk[] }[];
 }
 
 export type Part =

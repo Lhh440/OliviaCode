@@ -1,6 +1,6 @@
 {
   "name": "oliviacode",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "description": "OliviaCode — 本地优先的 AI 编程工作站",
   "workspaces": [

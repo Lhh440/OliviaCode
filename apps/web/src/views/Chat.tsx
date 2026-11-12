@@ -133,17 +133,51 @@ export function ChatView() {
             appendToolOutput(message, event.callId, event.chunk),
           );
           break;
-        case 'file.changed':
+        case 'file.proposed':
           patchMessage(messageId, (message) =>
             pushDiff(message, {
+              file: event.path,
+              adds: event.adds,
+              dels: event.dels,
+              hunks: event.edits.flatMap((edit) => edit.hunks),
+              state: 'pending',
+              callId: event.callId,
+              edits: event.edits,
+            }),
+          );
+          break;
+        case 'file.changed':
+          patchMessage(messageId, (message) => {
+            const index = message.parts.findIndex(
+              (part) => part.kind === 'diff' && event.callId && part.diff.callId === event.callId,
+            );
+            if (index >= 0) {
+              const parts = [...message.parts];
+              const current = parts[index];
+              if (current && current.kind === 'diff') {
+                parts[index] = {
+                  kind: 'diff',
+                  diff: {
+                    ...current.diff,
+                    adds: event.adds,
+                    dels: event.dels,
+                    hunks: event.hunks,
+                    state: 'accepted',
+                    snapshotId: event.snapshotId,
+                  },
+                };
+              }
+              return { ...message, parts };
+            }
+            return pushDiff(message, {
               file: event.path,
               adds: event.adds,
               dels: event.dels,
               hunks: event.hunks,
               state: 'accepted',
               snapshotId: event.snapshotId,
-            }),
-          );
+            });
+          });
           break;
         case 'turn.done': {
           patchMessage(messageId, (message) => settle(finishThinking(message)));
@@ -393,25 +427,47 @@ export function ChatView() {
     }));
   };
 
-  const onUndo = async (messageId: string): Promise<void> => {
+  const onUndo = async (messageId: string, snapshotId?: string): Promise<void> => {
     const api = window.olivia;
     const current = taskRef.current;
     if (!api || !current || !current.workspace) {
       setNotice('这个任务还没有绑定工作区，无法撤销');
       return;
     }
-    const result = await api.task.undo(current.id, current.workspace);
+    const result = await api.task.undo(current.id, current.workspace, snapshotId);
     setUndo(result);
     if (result.ok) {
       patchMessage(messageId, (message) => ({
         ...message,
         parts: message.parts.map((part) =>
-          part.kind === 'diff' && part.diff.state === 'accepted'
+          part.kind === 'diff' &&
+          part.diff.state === 'accepted' &&
+          (!snapshotId || part.diff.snapshotId === snapshotId)
             ? { kind: 'diff', diff: { ...part.diff, state: 'undone' } }
             : part,
         ),
       }));
     }
+  };
+
+  const onPatchDecide = (
+    messageId: string,
+    callId: string,
+    accepted: number[] | null,
+  ): void => {
+    const active = activeRef.current;
+    if (active) window.olivia?.turn.patch(active.turnId, callId, accepted);
+    patchMessage(messageId, (message) => ({
+      ...message,
+      parts: message.parts.map((part) =>
+        part.kind === 'diff' && part.diff.callId === callId
+          ? {
+              kind: 'diff',
+              diff: { ...part.diff, state: accepted && accepted.length > 0 ? 'accepted' : 'rejected' },
+            }
+          : part,
+      ),
+    }));
   };
 
   const changeModel = (model: string): void => {
@@ -512,7 +568,12 @@ export function ChatView() {
             )}
           </div>
         ) : (
-          <MessageList messages={messages} onDiffAction={onDiffAction} onUndo={onUndo} />
+          <MessageList
+            messages={messages}
+            onDiffAction={onDiffAction}
+            onUndo={onUndo}
+            onPatchDecide={onPatchDecide}
+          />
         )}
       </div>
 

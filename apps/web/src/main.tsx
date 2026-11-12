@@ -4,6 +4,7 @@ import App from './App';
 import './styles/theme.css';
 import './styles/shell.css';
 import './styles/workflow.css';
+import './styles/git.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('缺少 #root 挂载点');

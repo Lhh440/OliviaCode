@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { ApprovalDecision, ApprovalRequest, DiffFile, Message, Part, ToolRun, UndoResult } from '@olivia/core';
 import { Icon } from '../icons';
 import { Markdown } from './Markdown';
@@ -15,6 +16,9 @@ const TOOL_ICON: Record<string, string> = {
   list_dir: 'folder',
   git_status: 'git',
   git_diff: 'git',
+  git_commit: 'git',
+  git_push: 'git',
+  git_create_pr: 'git',
 };
 
 function ToolCard({ run }: { run: ToolRun }) {
@@ -46,9 +50,7 @@ function ToolCard({ run }: { run: ToolRun }) {
           ))}
         </div>
       )}
-      {lines.length > 0 && (
-        <pre className="tool-output">{lines.join('\n')}</pre>
-      )}
+      {lines.length > 0 && <pre className="tool-output">{lines.join('\n')}</pre>}
     </div>
   );
 }
@@ -59,6 +61,94 @@ const DIFF_STATE_LABEL: Record<DiffFile['state'], string> = {
   rejected: '已拒绝',
   undone: '已撤销',
 };
+
+function HunkLines({ diff }: { diff: DiffFile }) {
+  return (
+    <div className="diff-body">
+      {diff.hunks.map((hunk, index) => (
+        <div className="diff-hunk" key={`${hunk.header}-${index}`}>
+          <div className="hunk-head">{hunk.header}</div>
+          {hunk.lines.map((line, lineIndex) => (
+            <div className={`diff-line ${line.kind}`} key={lineIndex}>
+              <span className="gutter">
+                {line.kind === 'add' ? '+' : line.kind === 'del' ? '−' : ' '}
+              </span>
+              <span className="code">{line.text}</span>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** 逐处接受：apply_patch 的每条 edits 一个勾选项，应用后再落盘。 */
+function ProposalCard({
+  diff,
+  onDecide,
+}: {
+  diff: DiffFile;
+  onDecide: (accepted: number[] | null) => void;
+}) {
+  const edits = diff.edits ?? [];
+  const [selected, setSelected] = useState<number[]>(() => edits.map((edit) => edit.index));
+  const toggle = (index: number): void => {
+    setSelected((current) =>
+      current.includes(index) ? current.filter((item) => item !== index) : [...current, index].sort((a, b) => a - b),
+    );
+  };
+
+  return (
+    <div className="diff-card pending proposal">
+      <div className="diff-head">
+        <Icon name="file" size={14} />
+        <span className="diff-file">{diff.file}</span>
+        <span className="diff-stat">
+          <b className="add">+{diff.adds}</b>
+          <b className="del">−{diff.dels}</b>
+        </span>
+        <span className="diff-state pending">{edits.length} 处待接受</span>
+      </div>
+      <div className="proposal-body">
+        {edits.map((edit) => (
+          <label className="proposal-edit" key={edit.index}>
+            <div className="proposal-edit-head">
+              <input
+                type="checkbox"
+                checked={selected.includes(edit.index)}
+                onChange={() => toggle(edit.index)}
+              />
+              <span className="proposal-index">第 {edit.index + 1} 处</span>
+              <span className="diff-stat">
+                <b className="add">+{edit.adds}</b>
+                <b className="del">−{edit.dels}</b>
+              </span>
+            </div>
+            <HunkLines diff={{ ...diff, hunks: edit.hunks }} />
+          </label>
+        ))}
+      </div>
+      <div className="diff-foot">
+        <span className="diff-note">
+          <Icon name="shield" size={13} />
+          只应用勾选的改动，写入前自动快照
+        </span>
+        <div className="diff-actions">
+          <button className="btn ghost" onClick={() => onDecide(null)}>
+            全部拒绝
+          </button>
+          <button
+            className="btn primary"
+            disabled={selected.length === 0}
+            onClick={() => onDecide(selected)}
+          >
+            应用选中（{selected.length}）
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function DiffCard({
   diff,
@@ -80,21 +170,7 @@ function DiffCard({
         </span>
         <span className={`diff-state ${diff.state}`}>{DIFF_STATE_LABEL[diff.state]}</span>
       </div>
-      <div className="diff-body">
-        {diff.hunks.map((hunk, index) => (
-          <div className="diff-hunk" key={`${hunk.header}-${index}`}>
-            <div className="hunk-head">{hunk.header}</div>
-            {hunk.lines.map((line, lineIndex) => (
-              <div className={`diff-line ${line.kind}`} key={lineIndex}>
-                <span className="gutter">
-                  {line.kind === 'add' ? '+' : line.kind === 'del' ? '−' : ' '}
-                </span>
-                <span className="code">{line.text}</span>
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
+      <HunkLines diff={diff} />
       {diff.state === 'pending' && onAction ? (
         <div className="diff-foot">
           <span className="diff-note">
@@ -120,7 +196,7 @@ function DiffCard({
           <div className="diff-actions">
             <button className="btn ghost" onClick={onUndo}>
               <Icon name="rotate" size={13} />
-              撤销这次写入
+              回滚到这一步之前
             </button>
           </div>
         </div>
@@ -145,7 +221,8 @@ function ThinkingBlock({ text, done }: { text: string; done: boolean }) {
 export interface MessageListProps {
   messages: Message[];
   onDiffAction: (messageId: string, state: 'accepted' | 'rejected') => void;
-  onUndo: (messageId: string) => void;
+  onUndo: (messageId: string, snapshotId?: string) => void;
+  onPatchDecide: (messageId: string, callId: string, accepted: number[] | null) => void;
 }
 
 function renderPart(
@@ -163,12 +240,25 @@ function renderPart(
   if (part.kind === 'tool') {
     return <ToolCard key={`tool-${part.run.id}`} run={part.run} />;
   }
+  if (part.diff.state === 'pending' && part.diff.callId && part.diff.edits) {
+    return (
+      <ProposalCard
+        key={`proposal-${part.diff.callId}`}
+        diff={part.diff}
+        onDecide={(accepted) => props.onPatchDecide(message.id, part.diff.callId!, accepted)}
+      />
+    );
+  }
   return (
     <DiffCard
       key={`diff-${index}`}
       diff={part.diff}
       onAction={(state) => props.onDiffAction(message.id, state)}
-      onUndo={part.diff.snapshotId ? () => props.onUndo(message.id) : undefined}
+      onUndo={
+        part.diff.snapshotId
+          ? () => props.onUndo(message.id, part.diff.snapshotId)
+          : undefined
+      }
     />
   );
 }
@@ -238,7 +328,11 @@ export function UndoToast({ result }: { result: UndoResult }) {
   return (
     <div className={`undo-toast ${result.ok ? '' : 'error'}`}>
       <Icon name={result.ok ? 'rotate' : 'alert'} size={13} />
-      {result.ok ? `已撤销：${result.paths.join('、') || '文件已恢复'}` : result.message}
+      {result.ok
+        ? `已撤销：${result.paths.join('、') || '文件已恢复'}${
+            typeof result.remaining === 'number' ? ` · 还能回退 ${result.remaining} 步` : ''
+          }`
+        : result.message}
     </div>
   );
 }

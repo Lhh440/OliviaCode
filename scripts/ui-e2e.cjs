@@ -1,9 +1,10 @@
-// UI 自检：直接启动真实主进程，用脚本驱动界面走完「读 → 改 → 撤销」，并截图。
+// UI 自检：直接启动真实主进程，用脚本驱动界面走完「读 → 逐处接受 → 撤销 → Git 页」，并截图。
 // 用法：electron scripts/ui-e2e.cjs（需要 OLIVIA_BASE_URL / OLIVIA_API_KEY）
 const { app, BrowserWindow } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
+const { execFileSync } = require('node:child_process');
 
 const root = path.join(__dirname, '..');
 
@@ -12,7 +13,7 @@ const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'olivia-ui-'));
 app.setPath('userData', profile);
 app.setPath('sessionData', profile);
 
-// 临时工作区
+// 临时工作区（顺便做成一个 git 仓库，方便看 Git 页）
 const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'olivia-ws-'));
 fs.writeFileSync(
   path.join(workspace, 'README.md'),
@@ -24,6 +25,14 @@ fs.writeFileSync(
   JSON.stringify({ name: 'ui-demo', version: '1.0.0' }, null, 2),
   'utf8',
 );
+execFileSync('git', ['init', '-b', 'main'], { cwd: workspace });
+execFileSync('git', ['add', '-A'], { cwd: workspace });
+execFileSync(
+  'git',
+  ['-c', 'user.name=E2E', '-c', 'user.email=e2e@olivia.local', 'commit', '-m', 'init'],
+  { cwd: workspace },
+);
+
 process.env.OLIVIA_WORKSPACE = workspace;
 // 无头：不弹窗、不抢焦点，避免和正在用机器的人互相打断
 process.env.OLIVIA_HEADLESS = '1';
@@ -82,11 +91,10 @@ async function run() {
   }
   await wait(600);
 
-  // 新任务
   await js(win, `document.querySelector('.new-task')?.click(); true`);
   await wait(500);
 
-  // A1：读路径（无需审批）
+  // 第一轮：只读
   await type(win, 'README.md 的一级标题是什么？调用 read_file 确认，只回答标题本身。');
   const readDone = await waitFor(
     win,
@@ -94,42 +102,53 @@ async function run() {
     120_000,
   );
   await wait(600);
-  await shot(win, 'm1-read.png');
+  await shot(win, 'm2-read.png');
   console.log(`read turn finished: ${readDone}`);
 
-  // A2：写路径（会弹审批）
-  await type(win, '把 README.md 的第一行标题改成「# OliviaCode M1 测试仓库」，只改这一行，用 apply_patch。');
-  const gotApproval = await waitFor(win, `document.querySelector('.approval-bar')`, 90_000);
-  await wait(1000);
-  await shot(win, 'm1-approval.png');
-  console.log(`approval bar: ${gotApproval}`);
-  if (gotApproval) {
-    await js(win, `document.querySelector('.approval-bar .btn.primary')?.click(); true`);
-  }
+  // 第二轮：逐处接受的补丁
+  await type(
+    win,
+    '把 README.md 的第一行标题改成「# OliviaCode M1 测试仓库」，只改这一行，用 apply_patch。',
+  );
+  const gotProposal = await waitFor(win, `document.querySelector('.diff-card.proposal')`, 90_000);
+  await wait(900);
+  await shot(win, 'm2-proposal.png');
+  console.log(`proposal card: ${gotProposal}`);
+  await js(win, `document.querySelector('.proposal .btn.primary')?.click(); true`);
+
   const writeDone = await waitFor(
     win,
-    `!document.querySelector('.run-strip .spinner') && document.querySelector('.diff-card')`,
+    `!document.querySelector('.run-strip .spinner') && document.querySelector('.diff-card.accepted')`,
     120_000,
   );
-  await wait(600);
-  await shot(win, 'm1-diff.png');
+  await wait(700);
+  await shot(win, 'm2-diff.png');
   console.log(`write turn finished: ${writeDone}`);
 
   const afterWrite = fs.readFileSync(path.join(workspace, 'README.md'), 'utf8');
   console.log('README after write:', JSON.stringify(afterWrite.split('\n')[0]));
 
-  // 撤销
+  // Git 页
+  await js(win, `window.location.hash = '#/git'; true`);
+  const gitReady = await waitFor(win, `document.querySelector('.git-card')`, 30_000);
+  await wait(900);
+  await shot(win, 'm3-git.png');
+  console.log(`git page ready: ${gitReady}`);
+
+  // 回对话页撤销
+  await js(win, `window.location.hash = '#/chat'; true`);
+  await wait(900);
   const undoable = await js(
     win,
-    `Boolean([...document.querySelectorAll('.diff-foot button')].find((b) => b.textContent.includes('撤销')))`,
+    `Boolean([...document.querySelectorAll('.diff-foot button')].find((b) => b.textContent.includes('回滚')))`,
   );
   if (undoable) {
     await js(
       win,
-      `([...document.querySelectorAll('.diff-foot button')].find((b) => b.textContent.includes('撤销'))).click(); true`,
+      `([...document.querySelectorAll('.diff-foot button')].find((b) => b.textContent.includes('回滚'))).click(); true`,
     );
-    await wait(1500);
-    await shot(win, 'm1-undo.png');
+    await wait(1600);
+    await shot(win, 'm2-undo.png');
     const restored = fs.readFileSync(path.join(workspace, 'README.md'), 'utf8');
     console.log('README after undo:', JSON.stringify(restored.split('\n')[0]));
     console.log(`undo ok: ${restored.startsWith('# Demo Repo')}`);

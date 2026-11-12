@@ -33,7 +33,7 @@ export function Sidebar({ route }: { route: Route }) {
       <div className="brand">
         <Mark size={22} />
         <span className="brand-name">OliviaCode</span>
-        <span className="brand-ver">0.4</span>
+        <span className="brand-ver">0.5</span>
       </div>
 
       <button className="new-task" onClick={onNewTask} title="新建任务">
@@ -60,6 +60,14 @@ export function Sidebar({ route }: { route: Route }) {
           <Icon name="workflow" size={15} />
           <span>工作流</span>
           <span className="nav-count">1</span>
+        </button>
+        <button
+          className={route === 'git' ? 'active' : ''}
+          onClick={() => navigate('git')}
+          title="Git"
+        >
+          <Icon name="git" size={15} />
+          <span>Git</span>
         </button>
         <button
           className={route === 'settings' ? 'active' : ''}
@@ -111,7 +119,7 @@ export function Sidebar({ route }: { route: Route }) {
               演示模式
             </span>
           )}
-          <span className="foot-version">v0.4.0 · M1</span>
+          <span className="foot-version">v0.5.0 · M2+M3</span>
         </div>
       </div>
     </aside>

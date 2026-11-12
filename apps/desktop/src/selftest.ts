@@ -9,6 +9,16 @@ import path from 'node:path';
 import type { SessionEvent, TurnEvent } from '@olivia/core';
 import { SnapshotStore, type Policy } from '@olivia/exec';
 import { runAgentTurn } from './agent';
+import {
+  commit,
+  git,
+  push,
+  readBranches,
+  readFileDiff,
+  readStatus,
+  stageHunks,
+  stagePaths,
+} from './git';
 import { SessionStore } from './sessions';
 
 const baseUrl = process.env.OLIVIA_BASE_URL || '';
@@ -59,6 +69,8 @@ async function turn(prompt: string, approval: 'ask' | 'auto' | 'never' = 'auto')
       if (event.type === 'tool.request') tools.push(event.call.name);
     },
     requestApproval: async () => 'once',
+    requestPatch: async (input) => input.edits.map((edit) => edit.index),
+    gitToken: () => null,
   }).catch((cause: unknown) => {
     error = cause instanceof Error ? cause.message : String(cause);
   });
@@ -131,6 +143,70 @@ async function main(): Promise<void> {
       kinds.has('tool.call') &&
       kinds.has('snapshot'),
     `events=${events.length} kinds=${[...kinds].join(',')}`,
+  );
+
+  // A5：多步撤销（直接打快照层，不依赖模型）
+  const multiStore = new SnapshotStore(path.join(workspace, '.olivia-e2e', 'multi'));
+  const multiPolicy: Policy = { mode: 'workspace-write', root: workspace };
+  const target = path.join(workspace, 'multi.txt');
+  await fs.writeFile(target, 'v0\n', 'utf8');
+  const snap1 = await multiStore.create('multi', multiPolicy, ['multi.txt']);
+  await fs.writeFile(target, 'v1\n', 'utf8');
+  const snap2 = await multiStore.create('multi', multiPolicy, ['multi.txt']);
+  await fs.writeFile(target, 'v2\n', 'utf8');
+
+  const newest = await multiStore.latest('multi');
+  if (newest) await multiStore.restore(newest, multiPolicy);
+  await multiStore.markUndone('multi', snap2.id);
+  const v1 = await fs.readFile(target, 'utf8');
+
+  const older = await multiStore.latest('multi');
+  if (older) await multiStore.restore(older, multiPolicy);
+  await multiStore.markUndone('multi', snap1.id);
+  const v0 = await fs.readFile(target, 'utf8');
+  record(
+    'A5 多步撤销',
+    v1.startsWith('v1') && v0.startsWith('v0'),
+    `after1=${v1.trim()} after2=${v0.trim()} remaining=${await multiStore.remaining('multi')}`,
+  );
+
+  // A6：本地 git 闭环（init → 提交 → 逐 hunk 暂存 → 推到裸仓库）
+  const repoDir = path.join(workspace, 'demo-repo');
+  await fs.mkdir(repoDir, { recursive: true });
+  await git(repoDir, ['init', '-b', 'main']);
+  await git(repoDir, ['config', 'user.name', 'Olivia E2E']);
+  await git(repoDir, ['config', 'user.email', 'e2e@olivia.local']);
+  await fs.writeFile(path.join(repoDir, 'notes.md'), 'alpha\n\n\n\n\nbeta\n', 'utf8');
+  await git(repoDir, ['add', '-A']);
+  await git(repoDir, ['commit', '-m', 'init']);
+
+  await fs.writeFile(path.join(repoDir, 'notes.md'), 'alpha changed\n\n\n\n\nbeta\n', 'utf8');
+  await fs.writeFile(path.join(repoDir, 'other.txt'), 'new file\n', 'utf8');
+  const statusBefore = await readStatus(repoDir);
+  const fileDiff = await readFileDiff(repoDir, 'notes.md', false);
+  let hunkStageOk = false;
+  if (fileDiff.hunks.length > 0) {
+    await stageHunks(repoDir, 'notes.md', [0]);
+    const staged = await git(repoDir, ['diff', '--cached', '--name-only']);
+    hunkStageOk = staged.stdout.includes('notes.md');
+  }
+  await stagePaths(repoDir, ['other.txt']);
+  const hash = await commit(repoDir, 'change notes + other');
+  const branches = await readBranches(repoDir);
+  const bare = path.join(workspace, 'bare.git');
+  await git(workspace, ['init', '--bare', bare]);
+  await git(repoDir, ['remote', 'add', 'origin', bare]);
+  const pushOutput = await push(repoDir, null).catch((error: unknown) =>
+    error instanceof Error ? error.message : String(error),
+  );
+  record(
+    'A6 本地 git 闭环',
+    hunkStageOk &&
+      Boolean(hash) &&
+      branches.some((branch) => branch.name === 'main' && branch.current) &&
+      statusBefore.files.length > 0 &&
+      typeof pushOutput === 'string',
+    `hunks=${fileDiff.hunks.length} staged=${hunkStageOk} commit=${hash} branches=${branches.length} push=${String(pushOutput).slice(0, 24)}`,
   );
 
   await fs.rm(workspace, { recursive: true, force: true });

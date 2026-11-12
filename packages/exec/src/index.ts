@@ -286,6 +286,8 @@ export interface Snapshot {
   at: number;
   taskId: string;
   files: SnapshotFile[];
+  /** 已经被撤销过的快照不再参与「最近一次」 */
+  undone?: boolean;
 }
 
 /**
@@ -331,14 +333,46 @@ export class SnapshotStore {
     return snapshot;
   }
 
-  async latest(taskId: string): Promise<Snapshot | null> {
+  async list(taskId: string): Promise<Snapshot[]> {
     const dir = this.taskDir(taskId);
     const names = await fs.readdir(dir).catch(() => [] as string[]);
-    const sorted = names.filter((name) => name.endsWith('.json')).sort();
-    const last = sorted[sorted.length - 1];
-    if (!last) return null;
-    const raw = await fs.readFile(path.join(dir, last), 'utf8');
-    return JSON.parse(raw) as Snapshot;
+    const snapshots: Snapshot[] = [];
+    for (const name of names.filter((item) => item.endsWith('.json')).sort()) {
+      try {
+        const raw = await fs.readFile(path.join(dir, name), 'utf8');
+        snapshots.push(JSON.parse(raw) as Snapshot);
+      } catch {
+        // 损坏的快照跳过
+      }
+    }
+    return snapshots;
+  }
+
+  async get(taskId: string, id: string): Promise<Snapshot | null> {
+    const snapshots = await this.list(taskId);
+    return snapshots.find((snapshot) => snapshot.id === id) ?? null;
+  }
+
+  /** 最近一次「还没被撤销」的快照 */
+  async latest(taskId: string): Promise<Snapshot | null> {
+    const snapshots = (await this.list(taskId)).filter((snapshot) => !snapshot.undone);
+    return snapshots[snapshots.length - 1] ?? null;
+  }
+
+  /** 还能回退几步 */
+  async remaining(taskId: string): Promise<number> {
+    return (await this.list(taskId)).filter((snapshot) => !snapshot.undone).length;
+  }
+
+  async markUndone(taskId: string, id: string): Promise<void> {
+    const snapshot = await this.get(taskId, id);
+    if (!snapshot) return;
+    const next: Snapshot = { ...snapshot, undone: true };
+    await fs.writeFile(
+      path.join(this.taskDir(taskId), `${snapshot.id}.json`),
+      JSON.stringify(next),
+      'utf8',
+    );
   }
 
   /** 还原快照里的文件，返回被恢复的路径。 */

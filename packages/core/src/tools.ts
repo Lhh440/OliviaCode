@@ -130,6 +130,38 @@ export const TOOLS: ToolSpec[] = [
       properties: { path: { type: 'string', description: '可选，相对路径' } },
     },
   },
+  {
+    name: 'git_commit',
+    description:
+      '把暂存区的改动提交。调用前先看 git_status；提交信息写清「改了什么、为什么」，首行不超过 60 字。未暂存的改动不会进这次提交。',
+    risk: 'write',
+    parameters: {
+      type: 'object',
+      properties: { message: { type: 'string', description: '提交信息' } },
+      required: ['message'],
+    },
+  },
+  {
+    name: 'git_push',
+    description: '把当前分支推到 origin。需要用户已在设置里保存对应平台的令牌；绝不 force push。',
+    risk: 'exec',
+    parameters: { type: 'object', properties: {} },
+  },
+  {
+    name: 'git_create_pr',
+    description:
+      '在当前仓库创建 Pull Request，需要先 push。标题与描述要让用户先看；目标分支默认 main。',
+    risk: 'exec',
+    parameters: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'PR 标题' },
+        body: { type: 'string', description: 'PR 描述（Markdown）' },
+        base: { type: 'string', description: '目标分支，默认 main' },
+      },
+      required: ['title', 'body'],
+    },
+  },
 ];
 
 export const TOOL_BY_NAME: Map<string, ToolSpec> = new Map(TOOLS.map((tool) => [tool.name, tool]));
@@ -169,6 +201,12 @@ export function describeCall(name: string, rawArgs: unknown): string {
     }
     case 'git_diff':
       return String(args.path ?? '全部改动');
+    case 'git_commit':
+      return String(args.message ?? '').split('\n')[0]?.slice(0, 60) ?? '';
+    case 'git_push':
+      return '推送到 origin';
+    case 'git_create_pr':
+      return String(args.title ?? '');
     default:
       return '';
   }

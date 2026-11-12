@@ -4,11 +4,13 @@ import {
   diffText,
   isMutating,
   toolSpec,
-  uid,
   type ApprovalDecision,
   type ApprovalMode,
   type ApprovalRequest,
+  type GitProvider,
   type Part,
+  type PatchDecision,
+  type PatchEditPreview,
   type SessionEvent,
   type TurnEvent,
 } from '@olivia/core';
@@ -21,9 +23,12 @@ import {
   runCommand,
   searchText,
   writeText,
+  type PatchEdit,
   type Policy,
   type SnapshotStore,
 } from '@olivia/exec';
+import { commit as gitCommit, push as gitPush, readBranches, readStatus } from './git';
+import { createPullRequest } from './providers';
 import type { SessionStore } from './sessions';
 import { loadPolicy, policyAllows, rememberRule } from './workspace';
 
@@ -67,6 +72,14 @@ export interface AgentOptions {
   sessions: SessionStore;
   emit: (event: TurnEvent) => void;
   requestApproval: (request: ApprovalRequest) => Promise<ApprovalDecision>;
+  requestPatch: (input: {
+    callId: string;
+    path: string;
+    edits: PatchEditPreview[];
+    adds: number;
+    dels: number;
+  }) => Promise<PatchDecision>;
+  gitToken: (provider: GitProvider) => string | null;
   signal: AbortSignal;
 }
 
@@ -94,6 +107,24 @@ function truncate(text: string, limit = MAX_TOOL_RESULT): string {
 
 function formatToolResult(name: string, text: string): string {
   return truncate(`[${name}]\n${text}`);
+}
+
+/** 校验每条 edits 的 old 是否唯一命中，并生成逐条预览。 */
+function previewEdits(before: string, edits: PatchEdit[]): PatchEditPreview[] {
+  if (edits.length === 0) throw new Error('edits 不能为空');
+  return edits.map((edit, index) => {
+    if (!edit.old.trim()) throw new Error(`第 ${index + 1} 条修改的 old 为空`);
+    const occurrences = before.split(edit.old).length - 1;
+    if (occurrences === 0) {
+      throw new Error(`第 ${index + 1} 条修改找不到原文，请先 read_file 确认内容与缩进`);
+    }
+    if (occurrences > 1) {
+      throw new Error(`第 ${index + 1} 条修改的原文出现了 ${occurrences} 次，请补足上下文让它唯一`);
+    }
+    const applied = before.replace(edit.old, edit.new);
+    const diff = diffText(before, applied);
+    return { index, adds: diff.adds, dels: diff.dels, hunks: diff.hunks };
+  });
 }
 
 async function streamCompletion(
@@ -223,6 +254,7 @@ async function executeTool(
   args: Record<string, unknown>,
   callId: string,
   log: (event: SessionEvent) => void,
+  accepted?: number[],
 ): Promise<ExecutedTool> {
   const { policy } = options;
   switch (name) {
@@ -287,12 +319,16 @@ async function executeTool(
     }
     case 'apply_patch': {
       const rel = String(args.path ?? '');
-      const edits = Array.isArray(args.edits)
+      const allEdits = Array.isArray(args.edits)
         ? (args.edits as { old?: unknown; new?: unknown }[]).map((edit) => ({
             old: String(edit?.old ?? ''),
             new: String(edit?.new ?? ''),
           }))
         : [];
+      const edits = accepted
+        ? allEdits.filter((_, index) => accepted.includes(index))
+        : allEdits;
+      if (edits.length === 0) throw new Error('没有接受任何改动');
       const snapshot = await options.snapshots.create(options.taskId, policy, [rel]);
       log({ at: Date.now(), type: 'snapshot', id: snapshot.id, files: [rel] });
       const { before, after } = await applyEdits(policy, rel, edits);
@@ -304,11 +340,12 @@ async function executeTool(
         dels: diff.dels,
         hunks: diff.hunks,
         snapshotId: snapshot.id,
+        callId,
       });
       log({ at: Date.now(), type: 'file.changed', path: rel, adds: diff.adds, dels: diff.dels });
       return {
         status: 'ok',
-        text: `已修改 ${rel}（+${diff.adds} −${diff.dels}）`,
+        text: `已修改 ${rel}（${edits.length} 处，+${diff.adds} −${diff.dels}）`,
         summary: `+${diff.adds} −${diff.dels}`,
         rows: [rel],
       };
@@ -349,6 +386,51 @@ async function executeTool(
       const clipped = text.slice(0, 20_000) || '（没有未提交改动）';
       return { status: 'ok', text: clipped, summary: '未提交改动', rows: rel ? [rel] : [] };
     }
+    case 'git_commit': {
+      const message = String(args.message ?? '');
+      const hash = await gitCommit(policy.root, message);
+      return {
+        status: 'ok',
+        text: `已提交 ${hash}：${message.split('\n')[0] ?? ''}`,
+        summary: hash,
+        rows: [message.split('\n')[0] ?? ''],
+      };
+    }
+    case 'git_push': {
+      const status = await readStatus(policy.root);
+      const provider = status.remote?.provider;
+      if (!provider) throw new Error('没有识别出远程仓库，请用户先绑定 origin');
+      const token = options.gitToken(provider);
+      if (!token) throw new Error(`没有 ${provider} 令牌，请用户到「设置 → Git 凭据」保存`);
+      const output = await gitPush(policy.root, { provider, token });
+      return {
+        status: 'ok',
+        text: output.trim() || '已推送',
+        summary: '已推送',
+        rows: [status.branch],
+      };
+    }
+    case 'git_create_pr': {
+      const status = await readStatus(policy.root);
+      if (!status.remote) throw new Error('没有识别出远程仓库');
+      const token = options.gitToken(status.remote.provider);
+      if (!token) throw new Error('缺少平台令牌，请用户到「设置 → Git 凭据」保存');
+      const result = await createPullRequest({
+        remote: status.remote,
+        token,
+        title: String(args.title ?? ''),
+        body: String(args.body ?? ''),
+        head: status.branch,
+        base: String(args.base ?? 'main'),
+      });
+      if (!result.ok) throw new Error(result.message ?? 'PR 创建失败');
+      return {
+        status: 'ok',
+        text: `PR 已创建：${result.url ?? ''}`,
+        summary: 'PR 已创建',
+        rows: [result.url ?? ''],
+      };
+    }
     default:
       throw new Error(`未知工具：${name}`);
   }
@@ -387,19 +469,49 @@ function collectParts(parts: Part[], event: TurnEvent): void {
         }
       }
       break;
-    case 'file.changed':
+    case 'file.proposed': {
       parts.push({
         kind: 'diff',
         diff: {
           file: event.path,
           adds: event.adds,
           dels: event.dels,
-          hunks: event.hunks,
-          state: 'accepted',
-          snapshotId: event.snapshotId,
+          hunks: event.edits.flatMap((edit) => edit.hunks),
+          state: 'pending',
+          callId: event.callId,
+          edits: event.edits,
         },
       });
       break;
+    }
+    case 'file.changed': {
+      const existing = parts.find(
+        (part) => part.kind === 'diff' && event.callId && part.diff.callId === event.callId,
+      );
+      if (existing && existing.kind === 'diff') {
+        existing.diff = {
+          ...existing.diff,
+          adds: event.adds,
+          dels: event.dels,
+          hunks: event.hunks,
+          state: 'accepted',
+          snapshotId: event.snapshotId,
+        };
+      } else {
+        parts.push({
+          kind: 'diff',
+          diff: {
+            file: event.path,
+            adds: event.adds,
+            dels: event.dels,
+            hunks: event.hunks,
+            state: 'accepted',
+            snapshotId: event.snapshotId,
+          },
+        });
+      }
+      break;
+    }
     default:
       break;
   }
@@ -509,10 +621,13 @@ async function runAgentLoop(options: AgentOptions): Promise<void> {
       const detail = describeCall(call.name, args);
       const mutating = spec ? isMutating(call.name) : false;
       const allowedByPolicy = spec ? policyAllows(policyFile, call.name, args) : false;
+      const isPatch = call.name === 'apply_patch';
+      const patchAsk = isPatch && options.approval === 'ask' && !allowedByPolicy;
       const mustAsk =
         Boolean(spec) &&
         mutating &&
         !allowedByPolicy &&
+        !isPatch &&
         (options.approval === 'ask' ||
           (options.approval === 'auto' && spec?.risk === 'exec'));
 
@@ -524,8 +639,48 @@ async function runAgentLoop(options: AgentOptions): Promise<void> {
       });
 
       let decision: 'auto' | ApprovalDecision = 'auto';
+      let acceptedEdits: number[] | undefined;
+
       if (!spec) {
         decision = 'reject';
+      } else if (patchAsk) {
+        // 逐处接受：先出预览，由用户勾选要应用哪几条
+        try {
+          const rel = String(args.path ?? '');
+          const before = await readFile(policy, rel, 4 * 1024 * 1024);
+          const edits = Array.isArray(args.edits)
+            ? (args.edits as { old?: unknown; new?: unknown }[]).map((edit) => ({
+                old: String(edit?.old ?? ''),
+                new: String(edit?.new ?? ''),
+              }))
+            : [];
+          const previews = previewEdits(before, edits);
+          const adds = previews.reduce((sum, item) => sum + item.adds, 0);
+          const dels = previews.reduce((sum, item) => sum + item.dels, 0);
+          emit({ type: 'file.proposed', callId: call.id, path: rel, edits: previews, adds, dels });
+          const answer = await options.requestPatch({
+            callId: call.id,
+            path: rel,
+            edits: previews,
+            adds,
+            dels,
+          });
+          if (!answer || answer.length === 0) {
+            decision = 'reject';
+          } else {
+            acceptedEdits = answer;
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          toolErrors += 1;
+          emit({ type: 'tool.result', callId: call.id, status: 'error', summary: message.slice(0, 140) });
+          messages.push({
+            role: 'tool',
+            tool_call_id: call.id,
+            content: formatToolResult(call.name, `错误：${message}`),
+          });
+          continue;
+        }
       } else if (mustAsk) {
         const answer = await options.requestApproval({
           callId: call.id,
@@ -542,8 +697,10 @@ async function runAgentLoop(options: AgentOptions): Promise<void> {
       }
 
       if (decision === 'reject') {
-        const text = `用户拒绝执行 ${call.name}。请说明为什么需要它，或换一种不需要批准的做法。`;
-        emit({ type: 'tool.result', callId: call.id, status: 'error', summary: '已拒绝' });
+        const text = isPatch
+          ? '用户没有接受这次修改。请说明改动意图，或换成更小的、更明确的补丁。'
+          : `用户拒绝执行 ${call.name}。请说明为什么需要它，或换一种不需要批准的做法。`;
+        emit({ type: 'tool.result', callId: call.id, status: 'error', summary: isPatch ? '未接受' : '已拒绝' });
         log({
           at: Date.now(),
           type: 'tool.call',
@@ -552,14 +709,14 @@ async function runAgentLoop(options: AgentOptions): Promise<void> {
           args: call.args,
           decision: 'rejected',
           status: 'error',
-          summary: '已拒绝',
+          summary: isPatch ? '未接受' : '已拒绝',
         });
         messages.push({ role: 'tool', tool_call_id: call.id, content: text });
         continue;
       }
 
       try {
-        const result = await executeTool(options, call.name, args, call.id, log);
+        const result = await executeTool(options, call.name, args, call.id, log, acceptedEdits);
         emit({
           type: 'tool.result',
           callId: call.id,

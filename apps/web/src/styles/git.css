@@ -1,0 +1,340 @@
+/* —— 逐处接受 —— */
+.proposal-body {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--line);
+}
+
+.proposal-edit {
+  display: block;
+  border-bottom: 1px solid var(--line);
+}
+
+.proposal-edit:last-child {
+  border-bottom: none;
+}
+
+.proposal-edit-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: #fafafc;
+  font-size: 11.5px;
+  color: var(--text-2);
+}
+
+.proposal-index {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.proposal-edit .diff-body {
+  max-height: 200px;
+  background: #fcfcfd;
+}
+
+/* —— Git 页 —— */
+.git-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.git-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px 24px 40px;
+}
+
+.git-card {
+  max-width: 860px;
+  margin: 0 auto 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  box-shadow: var(--shadow-xs);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.git-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.git-card-head h2 {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.muted {
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+
+.git-file {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.git-file-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 11px;
+  font-size: 12.4px;
+  text-align: left;
+}
+
+.git-file-row:hover {
+  background: #fafafc;
+}
+
+.git-flag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background: #f1f1f4;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-2);
+}
+
+.git-flag.state-added,
+.git-flag.state-untracked {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.git-flag.state-deleted {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.git-flag.state-conflicted {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.git-path {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 11.8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.git-file-state {
+  font-size: 10.8px;
+  color: var(--text-3);
+}
+
+.git-hunks {
+  border-top: 1px solid var(--line);
+  background: #fcfcfd;
+  padding: 6px 0;
+}
+
+.git-hunk {
+  display: block;
+  padding: 0 10px 6px;
+}
+
+.git-hunk-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 10.8px;
+  color: #7a7a86;
+}
+
+.git-hunk pre {
+  margin: 2px 0 0;
+  padding: 4px 8px;
+  max-height: 190px;
+  overflow: auto;
+  background: #f6f6f9;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 11.2px;
+  line-height: 1.6;
+  white-space: pre;
+}
+
+.git-hunk-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 6px 12px 2px;
+}
+
+.git-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.git-pr-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.git-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  font-size: 11.5px;
+  color: var(--text-2);
+}
+
+.git-pr-link {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--accent);
+  word-break: break-all;
+}
+
+.git-log {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.git-log-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 2px;
+  font-size: 12px;
+  border-bottom: 1px solid #f4f4f7;
+}
+
+.git-log-row:last-child {
+  border-bottom: none;
+}
+
+.git-hash {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.git-subject {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.git-author {
+  font-size: 10.8px;
+  color: var(--text-3);
+}
+
+.git-hint {
+  padding: 8px 2px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.git-empty {
+  max-width: 560px;
+  margin: 8vh auto 0;
+  text-align: center;
+  color: var(--text-3);
+}
+
+.git-empty-mark {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 12px;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-2);
+}
+
+.git-empty h2 {
+  margin: 0 0 4px;
+  font-size: 16px;
+  color: var(--text);
+}
+
+.git-empty p {
+  margin: 0 0 16px;
+  font-size: 12.5px;
+}
+
+.git-empty-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* —— 凭据 —— */
+.vault-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 0;
+  border-top: 1px solid #f3f3f6;
+}
+
+.vault-row:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
+.vault-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.vault-state {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #f2f2f5;
+  color: var(--text-3);
+  font-size: 10.5px;
+  font-weight: 400;
+}
+
+.vault-state.on {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.vault-inputs {
+  display: flex;
+  gap: 8px;
+}
+
+.vault-inputs .input {
+  flex: 1;
+}

@@ -1,4 +1,5 @@
-import { APPROVALS, MODELS, type ApprovalMode } from '@olivia/core';
+import { useEffect, useState } from 'react';
+import { APPROVALS, MODELS, type ApprovalMode, type GitProvider, type VaultStatus } from '@olivia/core';
 import { Icon } from '../icons';
 import { useStore } from '../store';
 
@@ -6,6 +7,33 @@ export function SettingsView() {
   const { state, dispatch } = useStore();
   const settings = state.settings;
   const update = (patch: Partial<typeof settings>) => dispatch({ type: 'settings', patch });
+
+  const [vault, setVault] = useState<VaultStatus>({ gitcode: false, github: false });
+  const [tokens, setTokens] = useState<Record<GitProvider, string>>({ gitcode: '', github: '' });
+  const [vaultNotice, setVaultNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    void window.olivia?.vault.status().then(setVault);
+  }, []);
+
+  const saveToken = async (provider: GitProvider): Promise<void> => {
+    const api = window.olivia;
+    if (!api) return;
+    const result = await api.vault.set(provider, tokens[provider]);
+    setVaultNotice(result.ok ? '已加密保存' : result.message ?? '保存失败');
+    if (result.ok) {
+      setTokens((current) => ({ ...current, [provider]: '' }));
+      setVault(await api.vault.status());
+    }
+  };
+
+  const clearToken = async (provider: GitProvider): Promise<void> => {
+    const api = window.olivia;
+    if (!api) return;
+    await api.vault.clear(provider);
+    setVault(await api.vault.status());
+    setVaultNotice('已清除');
+  };
 
   return (
     <div className="settings-page">
@@ -154,6 +182,59 @@ export function SettingsView() {
         <section className="card">
           <div className="card-head">
             <span className="card-glyph">
+              <Icon name="key" size={16} />
+            </span>
+            <div>
+              <h2>Git 凭据</h2>
+              <p>用于推送与创建 PR。safeStorage 加密存在本机，只在主进程读取。</p>
+            </div>
+          </div>
+          {(['gitcode', 'github'] as GitProvider[]).map((provider) => (
+            <div className="vault-row" key={provider}>
+              <div className="vault-name">
+                {provider === 'github' ? 'GitHub' : 'GitCode'}
+                <span className={`vault-state ${vault[provider] ? 'on' : ''}`}>
+                  {vault[provider] ? '已保存' : '未保存'}
+                </span>
+              </div>
+              <div className="vault-inputs">
+                <input
+                  className="input"
+                  type="password"
+                  spellCheck={false}
+                  placeholder="粘贴访问令牌（只写不读）"
+                  value={tokens[provider]}
+                  onChange={(event) =>
+                    setTokens((current) => ({ ...current, [provider]: event.target.value }))
+                  }
+                />
+                <button
+                  className="btn"
+                  disabled={!tokens[provider].trim()}
+                  onClick={() => void saveToken(provider)}
+                >
+                  保存
+                </button>
+                <button
+                  className="btn ghost"
+                  disabled={!vault[provider]}
+                  onClick={() => void clearToken(provider)}
+                >
+                  清除
+                </button>
+              </div>
+            </div>
+          ))}
+          <p className="field-note">
+            <Icon name="shield" size={13} />
+            界面上只能覆盖或清除，读不回原文；也不会写进仓库的 .git/config。
+            {vaultNotice ? ` · ${vaultNotice}` : ''}
+          </p>
+        </section>
+
+        <section className="card">
+          <div className="card-head">
+            <span className="card-glyph">
               <Icon name="layers" size={16} />
             </span>
             <div>
@@ -164,7 +245,7 @@ export function SettingsView() {
           <div className="about-rows">
             <div className="about-row">
               <span>版本</span>
-              <b>0.4.0 · M1 工具闭环</b>
+              <b>0.5.0 · M2+M3</b>
             </div>
             <div className="about-row">
               <span>运行形态</span>
@@ -176,7 +257,7 @@ export function SettingsView() {
             </div>
             <div className="about-row">
               <span>下一步</span>
-              <b>M2：多步回滚与逐 hunk 接受</b>
+              <b>M4：多智能体并行与工作流真实执行</b>
             </div>
           </div>
         </section>
