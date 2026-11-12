@@ -19,10 +19,26 @@ export interface State {
 export const defaultSettings: Settings = {
   baseUrl: 'https://api.deepseek.com/v1',
   apiKey: '',
-  model: 'DeepSeek-V4.1-Flash',
+  model: 'deepseek-v4.1-flash',
   approval: 'ask',
   demo: true,
 };
+
+/** 开发/自托管时可用 OLIVIA_BASE_URL / OLIVIA_API_KEY / OLIVIA_MODEL 预置连接。 */
+function applyEnv<T extends { settings: Settings }>(state: T): T {
+  const env = typeof window !== 'undefined' ? window.olivia?.env : undefined;
+  if (!env?.apiKey) return state;
+  return {
+    ...state,
+    settings: {
+      ...state.settings,
+      baseUrl: env.baseUrl || state.settings.baseUrl,
+      apiKey: env.apiKey,
+      model: env.model || state.settings.model,
+      demo: false,
+    },
+  };
+}
 
 const STORAGE_KEY = 'olivia.state.v1';
 
@@ -32,17 +48,17 @@ function initState(): State {
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<State>;
       if (Array.isArray(parsed.tasks) && parsed.tasks.length >= 0) {
-        return {
+        return applyEnv({
           tasks: parsed.tasks,
           activeId: parsed.activeId ?? parsed.tasks[0]?.id ?? null,
           settings: { ...defaultSettings, ...(parsed.settings ?? {}), apiKey: '' },
-        };
+        });
       }
     }
   } catch {
     // 损坏的本地状态直接丢弃，用种子数据
   }
-  return { tasks: seedTasks, activeId: seedTasks[0]?.id ?? null, settings: defaultSettings };
+  return applyEnv({ tasks: seedTasks, activeId: seedTasks[0]?.id ?? null, settings: defaultSettings });
 }
 
 export type Action =
@@ -153,6 +169,26 @@ export function appendText(message: Message, delta: string): Message {
 
 export function pushTool(message: Message, run: ToolRun): Message {
   return { ...message, parts: [...message.parts, { kind: 'tool', run }] };
+}
+
+export function appendThinking(message: Message, delta: string): Message {
+  const parts = [...message.parts];
+  const last = parts[parts.length - 1];
+  if (last && last.kind === 'thinking' && !last.done) {
+    parts[parts.length - 1] = { ...last, text: last.text + delta };
+  } else {
+    parts.push({ kind: 'thinking', text: delta, done: false });
+  }
+  return { ...message, parts };
+}
+
+export function finishThinking(message: Message): Message {
+  return {
+    ...message,
+    parts: message.parts.map((part) =>
+      part.kind === 'thinking' && !part.done ? { ...part, done: true } : part,
+    ),
+  };
 }
 
 export function finishTool(message: Message, id: string, status: 'ok' | 'error', rows?: string[]): Message {

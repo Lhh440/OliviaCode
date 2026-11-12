@@ -97,10 +97,17 @@ export function Sidebar({ route }: { route: Route }) {
           <span className="workspace-state">未绑定</span>
         </div>
         <div className="foot-meta">
-          <span className="demo-pill">
-            <Icon name="sparkle" size={12} />
-            演示模式
-          </span>
+          {settings.apiKey ? (
+            <span className="demo-pill online">
+              <span className="live-dot" />
+              已连接
+            </span>
+          ) : (
+            <span className="demo-pill">
+              <Icon name="sparkle" size={12} />
+              演示模式
+            </span>
+          )}
           <span className="foot-version">v0.3.0 · M0</span>
         </div>
       </div>

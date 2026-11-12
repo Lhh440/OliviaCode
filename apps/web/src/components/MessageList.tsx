@@ -107,7 +107,28 @@ interface Props {
   onDiffAction: (messageId: string, state: 'accepted' | 'rejected') => void;
 }
 
-function renderPart(part: Part, index: number, message: Message, onDiffAction: Props['onDiffAction']) {
+function ThinkingBlock({ text, done }: { text: string; done: boolean }) {
+  return (
+    <details className="thinking" open={done ? undefined : true}>
+      <summary>
+        <Icon name="sparkle" size={12} />
+        <span>{done ? '思考过程' : '正在思考…'}</span>
+        <span className="thinking-meta">{text.length} 字</span>
+      </summary>
+      <div className="thinking-body">{text}</div>
+    </details>
+  );
+}
+
+function renderPart(
+  part: Part,
+  index: number,
+  message: Message,
+  onDiffAction: Props['onDiffAction'],
+) {
+  if (part.kind === 'thinking') {
+    return <ThinkingBlock key={`think-${index}`} text={part.text} done={part.done} />;
+  }
   if (part.kind === 'text') {
     return (
       <p className="prose" key={`text-${index}`}>

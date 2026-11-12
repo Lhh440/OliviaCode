@@ -16,8 +16,26 @@
 - **Codex 式外壳**：左侧任务列表、顶部标题/分支/审批/模型、消息流里的工具调用卡片、内联 diff 卡片与「接受 / 拒绝」。
 - **工作流画布**（`#/workflow`）：节点库拖拽或点击添加、节点拖动、从右侧端口拖出连线、滚轮缩放、空白处拖拽平移、适配视图、右侧检查器改模型/提示词/工具/重试/超时/隔离、导出与导入 JSON、重置。
 - **模拟执行**：点「运行工作流」按拓扑顺序推进状态，到「人工审批门」停下并变绿为「批准并继续」。
-- **真模型直连**：在设置里填 OpenAI 兼容的 Base URL + API Key，对话立即走真实流式接口；不填则用本地脚本回放（演示模式）。
+- **真模型直连**：OpenAI 兼容端点，流式输出；`reasoning_content` 会渲染成可折叠的「思考过程」。不配密钥则用本地脚本回放（演示模式）。
 - **本地持久化**：任务与工作流草稿存 localStorage，API Key 只留内存、不落盘。
+
+![真实模型对话](docs/screenshots/chat-live.png)
+
+## 接自己的模型
+
+客户端只认 OpenAI 兼容协议，两种接法：
+
+1. 应用内「设置 → 模型接入」填 Base URL 与 API Key（只存本次会话内存）；
+2. 开发或自托管时用环境变量预置（经 IPC 注入渲染层，同样不落盘）：
+
+```powershell
+$env:OLIVIA_BASE_URL='http://127.0.0.1:9088/v1'
+$env:OLIVIA_API_KEY='sk-...'
+$env:OLIVIA_MODEL='deepseek-v4.1-flash'
+npm start
+```
+
+模型目录与 `GET /models` 对齐：`deepseek-v4.1-flash`、`qwen3.8-27b`。换模型只需改 `packages/core/src/types.ts` 的 `MODELS`。
 
 ## 快速开始
 

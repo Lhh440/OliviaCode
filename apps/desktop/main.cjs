@@ -1,8 +1,14 @@
-const { app, BrowserWindow, shell, nativeTheme } = require('electron');
+const { app, BrowserWindow, shell, nativeTheme, ipcMain } = require('electron');
 const path = require('node:path');
+
+const { readEnv } = require('./env.cjs');
 
 const isDev = process.env.OLIVIA_DEV === '1';
 const devUrl = process.env.OLIVIA_DEV_URL || 'http://127.0.0.1:5273';
+
+ipcMain.on('olivia:env', (event) => {
+  event.returnValue = readEnv();
+});
 
 function createWindow() {
   const win = new BrowserWindow({

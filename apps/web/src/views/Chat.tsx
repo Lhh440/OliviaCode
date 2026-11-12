@@ -1,12 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
-import { APPROVALS, MODELS, uid, titleFromPrompt, type Message, type TaskStatus } from '@olivia/core';
+import {
+  APPROVALS,
+  MODELS,
+  modelLabel,
+  uid,
+  titleFromPrompt,
+  type Message,
+  type TaskStatus,
+} from '@olivia/core';
 import { runTurn, type TurnHandle } from '../agent';
 import { Composer } from '../components/Composer';
 import { MessageList } from '../components/MessageList';
 import { Icon, Mark } from '../icons';
 import {
   appendText,
-  deriveStatus,
+  appendThinking,
+  finishThinking,
   finishTool,
   pushDiff,
   pushTool,
@@ -120,7 +129,15 @@ export function ChatView() {
             type: 'patchMessage',
             taskId: task.id,
             messageId: assistant.id,
-            patch: (message) => appendText(message, event.delta),
+            patch: (message) => appendText(finishThinking(message), event.delta),
+          });
+          break;
+        case 'thinking':
+          dispatch({
+            type: 'patchMessage',
+            taskId: task.id,
+            messageId: assistant.id,
+            patch: (message) => appendThinking(message, event.delta),
           });
           break;
         case 'tool.start':
@@ -160,7 +177,7 @@ export function ChatView() {
             type: 'patchMessage',
             taskId: task.id,
             messageId: assistant.id,
-            patch: settle,
+            patch: (message) => settle(finishThinking(message)),
           });
           setStreaming(false);
           turnRef.current = null;
@@ -247,8 +264,8 @@ export function ChatView() {
             title="模型"
           >
             {MODELS.map((model) => (
-              <option key={model} value={model}>
-                {model}
+              <option key={model.id} value={model.id}>
+                {model.label}
               </option>
             ))}
           </select>
@@ -304,7 +321,9 @@ export function ChatView() {
           )}
           <Composer value={draft} onChange={setDraft} onSend={send} disabled={streaming} />
           <div className="chat-note">
-            {demo ? '演示模式：未配置密钥，回复由本地脚本回放；在设置里填入 OpenAI 兼容端点即可走真实模型。' : `已连接 ${state.settings.model} · 密钥仅在本机内存中`}
+            {demo
+              ? '演示模式：未配置密钥，回复由本地脚本回放；在设置里填入 OpenAI 兼容端点即可走真实模型。'
+              : `已连接 ${modelLabel(state.settings.model)} · 密钥仅在本机内存中`}
           </div>
         </div>
       </div>

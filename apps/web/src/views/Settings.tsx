@@ -62,7 +62,9 @@ export function SettingsView() {
               onChange={(event) => update({ model: event.target.value })}
             >
               {MODELS.map((model) => (
-                <option key={model}>{model}</option>
+                <option key={model.id} value={model.id}>
+                  {model.label}
+                </option>
               ))}
             </select>
           </label>

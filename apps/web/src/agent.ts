@@ -137,6 +137,7 @@ async function runLiveTurn(
       body: JSON.stringify({
         model: settings.model,
         stream: true,
+        max_tokens: 2048,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: prompt },
@@ -167,9 +168,13 @@ async function runLiveTurn(
         if (!payload || payload === '[DONE]') continue;
         try {
           const json = JSON.parse(payload) as {
-            choices?: { delta?: { content?: string; reasoning_content?: string } }[];
+            choices?: {
+              delta?: { content?: string; reasoning_content?: string; reasoning?: string };
+            }[];
           };
           const delta = json.choices?.[0]?.delta;
+          const thinking = delta?.reasoning_content ?? delta?.reasoning ?? '';
+          if (thinking) emit({ type: 'thinking', delta: thinking });
           const text = delta?.content ?? '';
           if (text) emit({ type: 'text', delta: text });
         } catch {

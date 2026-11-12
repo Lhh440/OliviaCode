@@ -85,11 +85,13 @@ export function Inspector({ node, onPatch, onDelete, onInsert }: Props) {
             <Field label="模型">
               <select
                 className="input"
-                value={node.model ?? MODELS[1]}
+                value={node.model ?? MODELS[0]!.id}
                 onChange={(event) => onPatch({ model: event.target.value })}
               >
                 {MODELS.map((model) => (
-                  <option key={model}>{model}</option>
+                  <option key={model.id} value={model.id}>
+                    {model.label}
+                  </option>
                 ))}
               </select>
             </Field>

@@ -13,6 +13,7 @@ import {
   STATUS_LABEL,
   edgePath,
   fitView,
+  modelShort,
   type NodeKind,
   type Viewport,
   type WfNode,
@@ -358,8 +359,11 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
               <div className="wf-node-sub">{node.subtitle}</div>
               <div className="wf-node-foot">
                 <span className="wf-node-model">
-                  {node.model ??
-                    (node.kind === 'trigger' ? '定时' : node.kind === 'gate' ? 'Policy' : '—')}
+                  {node.kind === 'trigger'
+                    ? '定时'
+                    : node.kind === 'gate'
+                      ? 'Policy'
+                      : modelShort(node.model)}
                 </span>
                 <span className={`wf-node-state ${node.status}`}>{STATUS_LABEL[node.status]}</span>
               </div>

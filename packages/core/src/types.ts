@@ -30,6 +30,7 @@ export interface DiffFile {
 
 export type Part =
   | { kind: 'text'; text: string }
+  | { kind: 'thinking'; text: string; done: boolean }
   | { kind: 'tool'; run: ToolRun }
   | { kind: 'diff'; diff: DiffFile };
 
@@ -60,13 +61,25 @@ export interface Settings {
   demo: boolean;
 }
 
-export const MODELS = [
-  'DeepSeek-V4.1-Flash',
-  'DeepSeek-V3.2',
-  'Claude-Sonnet-4.5',
-  'GPT-5.2-Codex',
-  'Qwen3.8-27B',
-] as const;
+export interface ModelInfo {
+  id: string;
+  label: string;
+  short: string;
+}
+
+/** 与后端 /models 对齐的真实 id；label 只用于展示。 */
+export const MODELS: ModelInfo[] = [
+  { id: 'deepseek-v4.1-flash', label: 'DeepSeek V4.1 Flash', short: 'DeepSeek 4.1' },
+  { id: 'qwen3.8-27b', label: 'Qwen3.8 27B', short: 'Qwen3.8' },
+];
+
+export function modelLabel(id: string | undefined): string {
+  return MODELS.find((model) => model.id === id)?.label ?? id ?? '未选择';
+}
+
+export function modelShort(id: string | undefined): string {
+  return MODELS.find((model) => model.id === id)?.short ?? id ?? '—';
+}
 
 export const APPROVALS: { value: ApprovalMode; label: string; hint: string }[] = [
   { value: 'ask', label: '每次询问', hint: '写入与命令执行前都要确认' },
@@ -101,6 +114,7 @@ export function titleFromPrompt(prompt: string): string {
 
 export type StreamEvent =
   | { type: 'text'; delta: string }
+  | { type: 'thinking'; delta: string }
   | { type: 'tool.start'; id: string; name: string; detail: string }
   | { type: 'tool.finish'; id: string; status: 'ok' | 'error'; rows?: string[] }
   | { type: 'diff'; diff: DiffFile }
