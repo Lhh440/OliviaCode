@@ -1,5 +1,6 @@
 import type { ApprovalDecision, ApprovalRequest, DiffFile, Message, Part, ToolRun, UndoResult } from '@olivia/core';
 import { Icon } from '../icons';
+import { Markdown } from './Markdown';
 
 const TOOL_ICON: Record<string, string> = {
   read_file: 'file',
@@ -157,11 +158,7 @@ function renderPart(
     return <ThinkingBlock key={`think-${index}`} text={part.text} done={part.done} />;
   }
   if (part.kind === 'text') {
-    return (
-      <p className="prose" key={`text-${index}`}>
-        {part.text}
-      </p>
-    );
+    return <Markdown key={`text-${index}`} text={part.text} />;
   }
   if (part.kind === 'tool') {
     return <ToolCard key={`tool-${part.run.id}`} run={part.run} />;
@@ -185,7 +182,7 @@ export function MessageList(props: MessageListProps) {
           <div className="msg user" key={message.id}>
             <div className="bubble">
               {message.parts.map((part, index) =>
-                part.kind === 'text' ? <p key={index}>{part.text}</p> : null,
+                part.kind === 'text' ? <Markdown key={index} text={part.text} /> : null,
               )}
             </div>
           </div>
