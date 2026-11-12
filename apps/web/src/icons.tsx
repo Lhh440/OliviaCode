@@ -131,6 +131,21 @@ const PATHS: Record<string, ReactNode> = {
     </>
   ),
   layers: <path d="M12 3.5l8.5 4.5L12 12.5 3.5 8zM3.5 12.5L12 17l8.5-4.5M3.5 16.5L12 21l8.5-4.5" />,
+  sun: (
+    <>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6" />
+    </>
+  ),
+  moon: <path d="M20 13.6A8.2 8.2 0 0 1 10.4 4a8.2 8.2 0 1 0 9.6 9.6z" />,
+  palette: (
+    <>
+      <path d="M12 3.5a8.5 8.5 0 0 0 0 17c1.4 0 2.2-.9 2.2-2 0-.6-.2-1-.6-1.5-.4-.5-.6-.9-.6-1.5 0-1.1.9-2 2-2h1.7c2.2 0 3.8-1.7 3.8-3.9C20.5 6.2 16.7 3.5 12 3.5z" />
+      <circle cx="8.6" cy="9.2" r="1.1" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="7.4" r="1.1" fill="currentColor" stroke="none" />
+      <circle cx="15.6" cy="9.4" r="1.1" fill="currentColor" stroke="none" />
+    </>
+  ),
 };
 
 export interface IconProps {
@@ -159,12 +174,22 @@ export function Icon({ name, size = 16, className, strokeWidth = 1.6 }: IconProp
   );
 }
 
-export function Mark({ size = 22 }: { size?: number }) {
+export function Mark({ size = 22, className }: { size?: number; className?: string }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="1.5" y="1.5" width="21" height="21" rx="6.5" fill="#1c1c1f" />
-      <circle cx="12" cy="12" r="4.9" stroke="#fff" strokeWidth="1.9" />
-      <circle cx="15.2" cy="8.8" r="1.05" fill="#fff" />
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className={className}
+    >
+      <circle cx="12" cy="12" r="10.3" stroke="currentColor" strokeWidth="0.9" opacity="0.45" />
+      <circle cx="12" cy="12" r="7.3" stroke="currentColor" strokeWidth="1.15" />
+      <circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="12" cy="12" r="1.05" fill="currentColor" />
+      <circle cx="16.6" cy="7.4" r="0.95" fill="currentColor" opacity="0.85" />
+      <path d="M12 1.7v1.4M12 20.9v1.4M1.7 12h1.4M20.9 12h1.4" stroke="currentColor" strokeWidth="0.9" opacity="0.5" />
     </svg>
   );
 }

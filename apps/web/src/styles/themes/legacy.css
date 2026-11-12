@@ -1,0 +1,248 @@
+/**
+ * 兼容层：工作流与 Git 面板沿用旧类名，这里把它们接到新配色上，
+ * 顺带补齐 .btn / .input / .chip 等共享原语。
+ */
+
+:root {
+  --surface: #fdfcf8;
+  --surface-2: #f4f1e9;
+  --bg-elev: #f7f4ed;
+  --canvas: #f7f4ed;
+  --line-soft: rgba(22, 24, 31, 0.07);
+  --dot: #ded7c6;
+  --green-line: #bcdcc8;
+  --amber-line: #e7d3ab;
+  --accent-strong: #2449b8;
+  --green: #1f7a4d;
+  --green-strong: #176641;
+  --toast-bg: rgba(22, 24, 31, 0.94);
+
+  --panel: #fdfcf8;
+  --sidebar: #f7f4ed;
+  --bg: #f2efe8;
+  --text: #16181f;
+  --text-2: #5c5a52;
+  --text-3: #8d8a80;
+  --line: #ddd7c9;
+  --line-strong: #c9c1ae;
+  --accent: #2f5bd7;
+  --accent-soft: #e9eefb;
+  --accent-line: #c3d0f2;
+  --amber: #9a6b1c;
+  --amber-soft: #fbf3e2;
+  --red: #c0392f;
+  --red-soft: #fbeceb;
+  --green-soft: #e9f5ee;
+
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --shadow-xs: 0 1px 2px rgba(22, 24, 31, 0.05);
+  --shadow-sm: 0 1px 3px rgba(22, 24, 31, 0.07), 0 1px 2px rgba(22, 24, 31, 0.05);
+  --shadow-md: 0 12px 32px rgba(22, 24, 31, 0.12), 0 2px 8px rgba(22, 24, 31, 0.07);
+  --font-mono: 'JetBrains Mono', 'SFMono-Regular', ui-monospace, Consolas, 'Liberation Mono', monospace;
+}
+
+.dark {
+  --surface: #16121a;
+  --surface-2: #1c1721;
+  --bg-elev: #100d14;
+  --canvas: #100d14;
+  --line-soft: rgba(239, 233, 224, 0.07);
+  --dot: #2e2532;
+  --green-line: #1f4030;
+  --amber-line: #4a3a1c;
+  --accent-strong: #d92b3f;
+  --green: #3fae7a;
+  --green-strong: #2f9a68;
+  --toast-bg: rgba(8, 7, 11, 0.95);
+
+  --panel: #16121a;
+  --sidebar: #0d0a11;
+  --bg: #07060a;
+  --text: #efe9e0;
+  --text-2: #a49c92;
+  --text-3: #6d6660;
+  --line: #291f26;
+  --line-strong: #3d2c35;
+  --accent: #f0354a;
+  --accent-soft: rgba(240, 53, 74, 0.14);
+  --accent-line: rgba(240, 53, 74, 0.42);
+  --amber: #e0b45a;
+  --amber-soft: rgba(224, 180, 90, 0.14);
+  --red: #ff5c6b;
+  --red-soft: rgba(240, 53, 74, 0.14);
+  --green-soft: rgba(63, 174, 122, 0.14);
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 12px 32px rgba(0, 0, 0, 0.55);
+}
+
+/* —— 共享原语（供工作流 / Git 面板使用）—— */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 11px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 500;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.btn:hover {
+  background: var(--surface-2);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.btn.primary:hover {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+}
+
+.btn.ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-2);
+}
+
+.btn.ghost:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.btn.danger {
+  color: var(--red);
+  border-color: transparent;
+  background: transparent;
+}
+
+.btn.danger:hover {
+  background: var(--red-soft);
+}
+
+.input {
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.input::placeholder {
+  color: var(--text-3);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.input.textarea,
+textarea.input {
+  height: auto;
+  min-height: 76px;
+  padding: 9px 10px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+select.input {
+  appearance: none;
+  padding-right: 28px;
+  cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-3) 50%),
+    linear-gradient(135deg, var(--text-3) 50%, transparent 50%);
+  background-position: calc(100% - 15px) 14px, calc(100% - 10px) 14px;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 9px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.chip.static {
+  background: var(--surface-2);
+}
+
+.link-btn {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 500;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.link-btn:hover {
+  text-decoration: underline;
+}
+
+.spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1.6px solid var(--accent-soft);
+  border-top-color: var(--accent);
+  animation: olivia-spin 0.7s linear infinite;
+}
+
+@keyframes olivia-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.caret {
+  display: inline-block;
+  width: 7px;
+  height: 15px;
+  margin-left: 2px;
+  vertical-align: -2px;
+  border-radius: 2px;
+  background: var(--accent);
+  animation: olivia-caret 1.05s steps(1) infinite;
+}
+
+@keyframes olivia-caret {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0.12;
+  }
+}

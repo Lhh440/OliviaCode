@@ -1,0 +1,357 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --olivia-bg: #f2efe8;
+    --olivia-ink: #16181f;
+    --olivia-accent: #2f5bd7;
+    --olivia-gold: #a8853f;
+    color-scheme: light;
+  }
+
+  .dark {
+    --olivia-bg: #07060a;
+    --olivia-ink: #efe9e0;
+    --olivia-accent: #f0354a;
+    --olivia-gold: #e0b45a;
+    color-scheme: dark;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background: var(--olivia-bg);
+    color: var(--olivia-ink);
+    font-family: theme('fontFamily.sans');
+    font-size: 13.5px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow: hidden;
+    transition: background-color 0.45s ease, color 0.45s ease;
+  }
+
+  ::selection {
+    background: rgba(47, 91, 215, 0.2);
+  }
+
+  .dark ::selection {
+    background: rgba(240, 53, 74, 0.3);
+  }
+
+  /* 古典衬线标题 */
+  h1,
+  h2,
+  h3 {
+    font-family: theme('fontFamily.serif');
+    letter-spacing: -0.01em;
+  }
+
+  ::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(22, 24, 31, 0.16);
+    border: 2.5px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+  }
+
+  .dark ::-webkit-scrollbar-thumb {
+    background: rgba(239, 233, 224, 0.18);
+    border: 2.5px solid transparent;
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(22, 24, 31, 0.3);
+    border: 2.5px solid transparent;
+    background-clip: content-box;
+  }
+
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: rgba(239, 233, 224, 0.3);
+    border: 2.5px solid transparent;
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--olivia-accent);
+    outline-offset: 2px;
+  }
+
+  textarea:focus,
+  textarea:focus-visible,
+  input:focus,
+  input:focus-visible,
+  select:focus,
+  select:focus-visible {
+    outline: none;
+  }
+}
+
+@layer components {
+  /* 版画本体：空闲显形，对话退隐（浓度按皮肤给） */
+  :root[data-skin='angel'] {
+    --art-idle: 0.5;
+    --art-work: 0.2;
+    --wash-idle: 0.42;
+    --wash-work: 0.2;
+  }
+
+  :root[data-skin='collage'] {
+    --art-idle: 0.5;
+    --art-work: 0.15;
+    --wash-idle: 0.5;
+    --wash-work: 0.24;
+  }
+
+  :root[data-skin='lily'] {
+    --art-idle: 0.56;
+    --art-work: 0.24;
+    --wash-idle: 0.38;
+    --wash-work: 0.2;
+  }
+
+  :root[data-skin='madonna'] {
+    --art-idle: 0.55;
+    --art-work: 0.2;
+    --wash-idle: 0.46;
+    --wash-work: 0.22;
+  }
+
+  .art-plate {
+    opacity: var(--art-idle, 0.5);
+    transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: opacity;
+  }
+
+  .art-wash {
+    opacity: var(--wash-idle, 0.42);
+    transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  :root[data-density='work'] .art-plate {
+    opacity: var(--art-work, 0.2);
+  }
+
+  :root[data-density='work'] .art-wash {
+    opacity: var(--wash-work, 0.2);
+  }
+
+  /* 小字距标签 */
+  .eyebrow {
+    @apply text-[9.5px] font-medium uppercase tracking-[0.22em];
+    color: var(--olivia-gold);
+  }
+
+  /* 标题：蚀刻金属（亮）/ 镀铬（暗） */
+  .text-plate {
+    background-image: linear-gradient(176deg, #10131c 0%, var(--olivia-accent) 58%, #10131c 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .dark .text-plate {
+    background-image: linear-gradient(
+      176deg,
+      #fff4e6 0%,
+      #efb9b2 30%,
+      var(--olivia-accent) 54%,
+      var(--olivia-gold) 76%,
+      #fff2da 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* 按钮 */
+  .btn-solid {
+    @apply inline-flex items-center gap-1.5 h-7 px-3 rounded-lg text-[12px] font-medium;
+    @apply text-white;
+    @apply shadow-sm hover:brightness-110 active:scale-[0.98];
+    @apply transition-all duration-200;
+    background: var(--olivia-accent);
+  }
+
+  .btn-solid:hover {
+    background: var(--olivia-accent-strong);
+  }
+
+  .btn-outline {
+    @apply inline-flex items-center gap-1.5 h-7 px-3 rounded-lg text-[12px] font-medium;
+    @apply border border-light-lineStrong dark:border-dark-lineStrong;
+    @apply bg-white/60 dark:bg-white/[0.06] backdrop-blur-sm;
+    @apply text-light-ink dark:text-dark-ink;
+    @apply hover:bg-white/90 dark:hover:bg-white/[0.12] active:scale-[0.98];
+    @apply transition-all duration-200;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[12px] font-medium;
+    @apply text-light-inkMuted dark:text-dark-inkMuted;
+    @apply hover:bg-black/[0.05] dark:hover:bg-white/[0.07];
+    @apply hover:text-light-ink dark:hover:text-dark-ink;
+    @apply active:scale-[0.98] transition-all duration-200;
+  }
+
+  .btn-ghost:disabled,
+  .btn-solid:disabled,
+  .btn-outline:disabled {
+    @apply opacity-40 cursor-not-allowed active:scale-100;
+  }
+
+  /* 面板 */
+  .panel {
+    @apply rounded-2xl border border-light-line dark:border-dark-line;
+    @apply bg-light-panel dark:bg-dark-panel;
+    @apply backdrop-blur-xl;
+  }
+
+  .panel-strong {
+    @apply rounded-2xl border border-light-line dark:border-dark-line;
+    @apply bg-light-panelStrong dark:bg-dark-panelStrong;
+    @apply backdrop-blur-2xl shadow-[0_18px_50px_-24px_rgba(22,24,31,0.35)];
+  }
+
+  /* 输入 */
+  .field-input {
+    @apply w-full h-9 px-3 rounded-lg text-[13px];
+    @apply border border-light-line dark:border-dark-line;
+    @apply bg-white/70 dark:bg-white/[0.05];
+    @apply text-light-ink dark:text-dark-ink;
+    @apply placeholder:text-light-inkFaint dark:placeholder:text-dark-inkFaint;
+    @apply outline-none transition-all duration-200;
+    @apply focus:border-light-accent/60 dark:focus:border-dark-accent/60;
+    @apply focus:ring-2 focus:ring-light-accent/15 dark:focus:ring-dark-accent/20;
+  }
+
+  .field-select {
+    @apply field-input appearance-none cursor-pointer pr-8;
+    background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+      linear-gradient(135deg, currentColor 50%, transparent 50%);
+    background-position: calc(100% - 14px) 16px, calc(100% - 9px) 16px;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+  }
+
+  /* Markdown 排版 */
+  .prose-olivia {
+    @apply text-[13.5px] leading-[1.72] text-light-ink dark:text-dark-ink;
+  }
+
+  .prose-olivia > * + * {
+    @apply mt-2.5;
+  }
+
+  .prose-olivia h1,
+  .prose-olivia h2,
+  .prose-olivia h3 {
+    @apply font-semibold text-light-ink dark:text-dark-ink;
+    @apply mt-4 mb-2 tracking-tight;
+  }
+
+  .prose-olivia h1 {
+    @apply text-[18px];
+  }
+
+  .prose-olivia h2 {
+    @apply text-[16px];
+  }
+
+  .prose-olivia h3 {
+    @apply text-[14px];
+  }
+
+  .prose-olivia p {
+    @apply my-0;
+  }
+
+  .prose-olivia strong {
+    @apply font-semibold text-light-ink dark:text-dark-ink;
+  }
+
+  .prose-olivia em {
+    @apply italic;
+  }
+
+  .prose-olivia a {
+    @apply text-light-accent dark:text-dark-gold underline decoration-1 underline-offset-2;
+  }
+
+  .prose-olivia code {
+    @apply font-mono text-[12px] px-1.5 py-0.5 rounded;
+    @apply bg-light-accent/[0.09] dark:bg-dark-gold/[0.12];
+    @apply text-light-accent dark:text-dark-gold;
+  }
+
+  .prose-olivia pre {
+    @apply p-3 rounded-xl overflow-x-auto text-[12px] font-mono leading-relaxed;
+    @apply bg-black/[0.045] dark:bg-black/45;
+    @apply border border-light-line dark:border-dark-line;
+  }
+
+  .prose-olivia pre code {
+    @apply bg-transparent p-0 text-inherit dark:text-inherit;
+  }
+
+  .prose-olivia ul,
+  .prose-olivia ol {
+    @apply pl-5 space-y-1;
+  }
+
+  .prose-olivia ul {
+    @apply list-disc;
+  }
+
+  .prose-olivia ol {
+    @apply list-decimal;
+  }
+
+  .prose-olivia blockquote {
+    @apply pl-3 border-l-2 border-light-accent/40 dark:border-dark-gold/40;
+    @apply text-light-inkMuted dark:text-dark-inkMuted italic;
+  }
+
+  .prose-olivia hr {
+    @apply my-4 border-0 h-px bg-light-line dark:bg-dark-line;
+  }
+}
+
+@layer utilities {
+  .drag-none {
+    -webkit-app-region: no-drag;
+  }
+
+  /* 古典装饰细线 */
+  .rule-ornate {
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      color-mix(in srgb, var(--olivia-accent) 35%, transparent) 20%,
+      color-mix(in srgb, var(--olivia-gold) 55%, transparent) 50%,
+      color-mix(in srgb, var(--olivia-accent) 35%, transparent) 80%,
+      transparent 100%
+    );
+  }
+}
