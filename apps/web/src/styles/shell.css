@@ -1146,3 +1146,169 @@
   background: var(--green);
   box-shadow: 0 0 0 3px rgba(31, 157, 85, 0.14);
 }
+
+/* —— M1：工作区 / 审批 / 命令输出 —— */
+.chip.workspace {
+  border: 1px solid var(--line-strong);
+  background: var(--panel);
+  font-size: 11.8px;
+  max-width: 200px;
+}
+
+.chip.workspace.unbound {
+  border-style: dashed;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.bind-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 18px;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+
+.bind-cta:hover {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.approval-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 11px;
+  border: 1px solid var(--accent-line);
+  border-radius: 12px;
+  background: var(--accent-soft);
+}
+
+.approval-icon {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: #fff;
+  color: #2b57cc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.approval-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.approval-text b {
+  font-size: 12px;
+  color: #22409a;
+}
+
+.approval-text code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #3a5aad;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.approval-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.tool-output {
+  margin: 0;
+  padding: 6px 10px 7px 40px;
+  border-top: 1px solid var(--line);
+  background: #fbfbfc;
+  font-family: var(--font-mono);
+  font-size: 11.2px;
+  line-height: 1.6;
+  color: var(--text-2);
+  max-height: 170px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
+.state-text.waiting {
+  font-size: 10.8px;
+  color: var(--amber);
+}
+
+.tool-card.waiting {
+  border-color: #efdcb6;
+  background: #fffdf8;
+}
+
+.tool-card.waiting .tool-state {
+  color: var(--amber);
+}
+
+.diff-state.undone {
+  background: #f4f4f6;
+  color: var(--text-3);
+}
+
+.undo-toast {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 11px;
+  border: 1px solid #bfe3cd;
+  border-radius: 10px;
+  background: var(--green-soft);
+  color: #146b3a;
+  font-size: 11.8px;
+}
+
+.undo-toast.error {
+  border-color: #f3cfcc;
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.run-strip.error {
+  border-color: #f3cfcc;
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.shell-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 34px;
+  padding: 0 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  background: var(--panel);
+  color: var(--text-2);
+  font-size: 12.3px;
+  text-align: left;
+}
+
+.shell-toggle:hover {
+  border-color: #cfcfd8;
+}
+
+.shell-toggle.on {
+  border-color: #bfe3cd;
+  background: var(--green-soft);
+  color: #146b3a;
+}

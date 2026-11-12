@@ -11,3 +11,4 @@ release/
 .idea/
 data/
 *.local
+apps/desktop/dist/

@@ -6,8 +6,8 @@ import {
   type Dispatch,
   type ReactNode,
 } from 'react';
-import type { Message, Settings, Task, TaskStatus, ToolRun, DiffFile } from '@olivia/core';
-import { uid } from '@olivia/core';
+import type { Message, SessionEvent, Settings, Task, TaskStatus, ToolRun, DiffFile } from '@olivia/core';
+import { replaySession, uid } from '@olivia/core';
 import { seedTasks } from './seed';
 
 export interface State {
@@ -22,6 +22,7 @@ export const defaultSettings: Settings = {
   model: 'deepseek-v4.1-flash',
   approval: 'ask',
   demo: true,
+  allowShell: false,
 };
 
 /** 开发/自托管时可用 OLIVIA_BASE_URL / OLIVIA_API_KEY / OLIVIA_MODEL 预置连接。 */
@@ -68,6 +69,7 @@ export type Action =
   | { type: 'addMessage'; taskId: string; message: Message }
   | { type: 'patchMessage'; taskId: string; messageId: string; patch: (message: Message) => Message }
   | { type: 'patchTask'; taskId: string; patch: Partial<Task> }
+  | { type: 'hydrateMessages'; taskId: string; messages: Message[] }
   | { type: 'settings'; patch: Partial<Settings> };
 
 function mapTask(state: State, id: string, fn: (task: Task) => Task): State {
@@ -101,6 +103,8 @@ export function reducer(state: State, action: Action): State {
       }));
     case 'patchTask':
       return mapTask(state, action.taskId, (task) => ({ ...task, ...action.patch }));
+    case 'hydrateMessages':
+      return mapTask(state, action.taskId, (task) => ({ ...task, messages: action.messages }));
     case 'settings':
       return { ...state, settings: { ...state.settings, ...action.patch } };
     default:
@@ -127,6 +131,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }, 260);
     return () => clearTimeout(timer);
   }, [state.tasks, state.activeId, state.settings]);
+
+  /** 启动时从主进程的事件日志重放，日志是消息的权威来源。 */
+  useEffect(() => {
+    const api = window.olivia;
+    if (!api?.task) return;
+    let alive = true;
+    void (async () => {
+      for (const task of state.tasks) {
+        if (!task.workspace) continue;
+        const payload = await api.task.load(task.id).catch(() => null);
+        if (!alive || !payload) return;
+        const messages = replaySession(payload.events as SessionEvent[]);
+        if (messages.length > 0) {
+          dispatch({ type: 'hydrateMessages', taskId: task.id, messages });
+        }
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return <StoreContext.Provider value={{ state, dispatch }}>{children}</StoreContext.Provider>;
 }
@@ -169,6 +195,17 @@ export function appendText(message: Message, delta: string): Message {
 
 export function pushTool(message: Message, run: ToolRun): Message {
   return { ...message, parts: [...message.parts, { kind: 'tool', run }] };
+}
+
+export function appendToolOutput(message: Message, callId: string, chunk: string): Message {
+  return {
+    ...message,
+    parts: message.parts.map((part) =>
+      part.kind === 'tool' && part.run.id === callId
+        ? { kind: 'tool', run: { ...part.run, status: 'running', output: (part.run.output ?? '') + chunk } }
+        : part,
+    ),
+  };
 }
 
 export function appendThinking(message: Message, delta: string): Message {

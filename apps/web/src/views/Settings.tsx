@@ -106,9 +106,48 @@ export function SettingsView() {
               </button>
             ))}
           </div>
+
+          <div className="field">
+            <span className="field-label">命令执行（run_command）</span>
+            {settings.allowShell ? (
+              <button
+                className="shell-toggle on"
+                onClick={() => update({ allowShell: false })}
+                title="关闭后所有命令都会被执行器拒绝"
+              >
+                <Icon name="check" size={14} />
+                已开启 · 点此关闭
+              </button>
+            ) : (
+              <button
+                className="shell-toggle"
+                onClick={() => {
+                  const ok = window.confirm(
+                    [
+                      '开启后，模型可以在你绑定的工作区里执行命令（例如 npm test、git status）。',
+                      '',
+                      '命令以参数数组启动、不经过 shell 拼接，但仍可能修改文件、安装依赖或访问网络。',
+                      '每次执行依然会按上面的审批策略询问你。',
+                      '',
+                      '确定开启吗？',
+                    ].join('\n'),
+                  );
+                  if (ok) update({ allowShell: true });
+                }}
+              >
+                <Icon name="terminal" size={14} />
+                开启命令执行（需要确认风险）
+              </button>
+            )}
+            <p className="field-note">
+              <Icon name="shield" size={13} />
+              默认关闭。关闭时模型读写文件仍然可用，但所有命令都会被拒绝。
+            </p>
+          </div>
+
           <div className="field-note">
             <Icon name="folder" size={13} />
-            工作区目录绑定会在 M1 落地；M0 阶段执行器只读运行，不落盘。
+            工作区是按任务绑定的：在对话头部点「绑定目录」选一次，之后这个任务只在该目录内读写。
           </div>
         </section>
 
@@ -125,7 +164,7 @@ export function SettingsView() {
           <div className="about-rows">
             <div className="about-row">
               <span>版本</span>
-              <b>0.3.0 · M0 骨架</b>
+              <b>0.4.0 · M1 工具闭环</b>
             </div>
             <div className="about-row">
               <span>运行形态</span>
@@ -137,7 +176,7 @@ export function SettingsView() {
             </div>
             <div className="about-row">
               <span>下一步</span>
-              <b>M1：真实工具调用 + 事件日志</b>
+              <b>M2：多步回滚与逐 hunk 接受</b>
             </div>
           </div>
         </section>

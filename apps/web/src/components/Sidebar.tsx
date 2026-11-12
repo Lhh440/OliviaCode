@@ -15,6 +15,9 @@ const STATUS_TITLE: Record<string, string> = {
 export function Sidebar({ route }: { route: Route }) {
   const { state, dispatch } = useStore();
   const { tasks, activeId, settings } = state;
+  const activeTask = tasks.find((task) => task.id === activeId);
+  const workspace = activeTask?.workspace;
+  const workspaceName = workspace ? workspace.split(/[\\/]/).filter(Boolean).pop() : '本地工作区';
 
   const onNewTask = () => {
     const task = createTask(settings);
@@ -30,7 +33,7 @@ export function Sidebar({ route }: { route: Route }) {
       <div className="brand">
         <Mark size={22} />
         <span className="brand-name">OliviaCode</span>
-        <span className="brand-ver">0.3</span>
+        <span className="brand-ver">0.4</span>
       </div>
 
       <button className="new-task" onClick={onNewTask} title="新建任务">
@@ -91,10 +94,10 @@ export function Sidebar({ route }: { route: Route }) {
       </div>
 
       <div className="sidebar-foot">
-        <div className="workspace-chip" title="M0 阶段尚未绑定本地目录">
+        <div className="workspace-chip" title={workspace ?? '当前任务还没有绑定工作区'}>
           <Icon name="folder" size={14} />
-          <span>本地工作区</span>
-          <span className="workspace-state">未绑定</span>
+          <span>{workspaceName}</span>
+          <span className="workspace-state">{workspace ? '' : '未绑定'}</span>
         </div>
         <div className="foot-meta">
           {settings.apiKey ? (
@@ -108,7 +111,7 @@ export function Sidebar({ route }: { route: Route }) {
               演示模式
             </span>
           )}
-          <span className="foot-version">v0.3.0 · M0</span>
+          <span className="foot-version">v0.4.0 · M1</span>
         </div>
       </div>
     </aside>

@@ -4,7 +4,11 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 
-const { readEnv } = require('../apps/desktop/env.cjs');
+const readEnv = () => ({
+  baseUrl: process.env.OLIVIA_BASE_URL || '',
+  apiKey: process.env.OLIVIA_API_KEY || '',
+  model: process.env.OLIVIA_MODEL || '',
+});
 
 ipcMain.on('olivia:env', (event) => {
   event.returnValue = readEnv();
@@ -58,7 +62,7 @@ app.whenReady().then(async () => {
     show: false,
     backgroundColor: '#fbfbfc',
     webPreferences: {
-      preload: path.join(root, 'apps', 'desktop', 'preload.cjs'),
+      preload: path.join(root, 'apps', 'desktop', 'dist', 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
     },

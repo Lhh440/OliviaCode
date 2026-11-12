@@ -6,8 +6,12 @@ export interface ToolRun {
   id: string;
   name: string;
   detail: string;
-  status: 'running' | 'ok' | 'error';
+  status: 'waiting' | 'running' | 'ok' | 'error';
   rows?: string[];
+  /** 执行中/已完成的命令输出尾巴 */
+  output?: string;
+  risk?: 'read' | 'write' | 'exec';
+  args?: Record<string, unknown>;
 }
 
 export interface DiffLine {
@@ -25,7 +29,9 @@ export interface DiffFile {
   adds: number;
   dels: number;
   hunks: DiffHunk[];
-  state: 'pending' | 'accepted' | 'rejected';
+  state: 'pending' | 'accepted' | 'rejected' | 'undone';
+  /** 真实写入时由主进程给出，用于「撤销这次写入」 */
+  snapshotId?: string;
 }
 
 export type Part =
@@ -51,6 +57,8 @@ export interface Task {
   status: TaskStatus;
   at: number;
   messages: Message[];
+  /** 每个任务绑定的工作区目录；M1 起任务之间互不串味 */
+  workspace?: string;
 }
 
 export interface Settings {
@@ -59,6 +67,8 @@ export interface Settings {
   model: string;
   approval: ApprovalMode;
   demo: boolean;
+  /** 命令执行总开关：默认关闭，需要用户在设置里显式确认风险 */
+  allowShell: boolean;
 }
 
 export interface ModelInfo {
