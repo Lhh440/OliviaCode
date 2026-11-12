@@ -1429,3 +1429,164 @@
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
+/* —— 新版输入框（模型 / 权限 / 项目位置都在框内） —— */
+.composer-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.composer {
+  position: relative;
+}
+
+.composer.busy {
+  border-color: var(--accent-line);
+}
+
+.composer-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.composer-plus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: #fff;
+  color: var(--text-2);
+  flex-shrink: 0;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.composer-plus:hover,
+.composer-plus.open {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.composer-menu {
+  position: absolute;
+  left: 0;
+  bottom: 40px;
+  z-index: 20;
+  min-width: 150px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.composer-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 9px;
+  border-radius: 7px;
+  color: var(--text-2);
+  font-size: 12.3px;
+  text-align: left;
+}
+
+.composer-menu button:hover {
+  background: #f4f4f7;
+  color: var(--text);
+}
+
+.composer-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--text-2);
+  font-size: 11.8px;
+  background: transparent;
+  white-space: nowrap;
+  max-width: 200px;
+}
+
+.composer-chip:hover {
+  background: #f3f3f6;
+  color: var(--text);
+}
+
+.composer-chip select {
+  appearance: none;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font-size: 11.8px;
+  cursor: pointer;
+  max-width: 130px;
+}
+
+.composer-chip.project span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.composer-chip.project.unbound {
+  border-style: dashed;
+  border-color: var(--line-strong);
+  color: var(--text-3);
+}
+
+.composer-chip.model {
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 11.2px;
+}
+
+.composer-chip.model select {
+  font-family: var(--font-mono);
+  font-size: 11.2px;
+}
+
+.chip-caret {
+  color: var(--text-3);
+  flex-shrink: 0;
+}
+
+.send-btn {
+  background: var(--accent);
+}
+
+.send-btn:hover:not(:disabled) {
+  background: #2f5fe0;
+}
+
+.send-btn.stop {
+  background: var(--accent);
+}
+
+.composer-stats {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  font-size: 10.8px;
+  color: var(--text-3);
+}
+
+.composer-stats span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}

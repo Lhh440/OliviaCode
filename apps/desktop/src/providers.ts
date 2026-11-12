@@ -60,13 +60,23 @@ async function createGitcode(input: PrInput): Promise<GitPrResult> {
       base: input.base,
     }),
   });
+  const raw = await response.text().catch(() => '');
   if (!response.ok) {
-    return { ok: false, message: `GitCode：${await readError(response)}` };
+    return { ok: false, message: `GitCode：${raw.slice(0, 300) || `HTTP ${response.status}`}` };
   }
-  const json = (await response.json().catch(() => ({}))) as { html_url?: string; number?: number };
+  let json: { html_url?: string; number?: number; iid?: number; pull_request?: { html_url?: string; number?: number } } = {};
+  try {
+    json = JSON.parse(raw) as typeof json;
+  } catch {
+    // GitCode 偶尔返回纯文本，退回列表地址
+  }
+  const inner = json.pull_request ?? json;
+  const number = inner.number ?? json.iid;
   return {
     ok: true,
-    url: json.html_url ?? `${input.remote.webUrl}/pulls`,
+    url:
+      inner.html_url ??
+      (number ? `${input.remote.webUrl}/merge_requests/${number}` : `${input.remote.webUrl}/pulls`),
   };
 }
 

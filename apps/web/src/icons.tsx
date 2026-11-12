@@ -35,6 +35,13 @@ const PATHS: Record<string, ReactNode> = {
   chevron: <path d="M8 10l4 4 4-4" />,
   chevronRight: <path d="M10 8l4 4-4 4" />,
   play: <path d="M8 5.5l10 6.5-10 6.5z" fill="currentColor" stroke="none" />,
+  stop: <rect x="7" y="7" width="10" height="10" rx="2.2" fill="currentColor" stroke="none" />,
+  info: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 10.8v5.2M12 7.6v.4" />
+    </>
+  ),
   pause: (
     <>
       <path d="M9 5v14M15 5v14" />

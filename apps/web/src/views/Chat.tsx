@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   APPROVALS,
   MODELS,
@@ -16,6 +16,7 @@ import { runDemoTurn, type TurnHandle } from '../agent';
 import { Composer } from '../components/Composer';
 import { ApprovalBar, MessageList, UndoToast } from '../components/MessageList';
 import { Icon, Mark } from '../icons';
+import { navigate } from '../router';
 import {
   appendText,
   appendThinking,
@@ -25,6 +26,7 @@ import {
   pushDiff,
   pushTool,
   settle,
+  createTask,
   useStore,
 } from '../store';
 
@@ -84,6 +86,29 @@ export function ChatView() {
   taskRef.current = task;
 
   const messages = task?.messages ?? [];
+
+  const stats = useMemo(() => {
+    let steps = 0;
+    let chars = 0;
+    for (const message of messages) {
+      for (const part of message.parts) {
+        if (part.kind === 'tool') steps += 1;
+        if (part.kind === 'text') chars += part.text.length;
+        if (part.kind === 'thinking') chars += part.text.length;
+        if (part.kind === 'diff') {
+          chars += part.diff.hunks.reduce((sum, hunk) => sum + hunk.lines.length, 0) * 32;
+        }
+      }
+    }
+    const tokens = Math.round(chars / 3.4);
+    const percent = Math.min(99, (tokens / 128_000) * 100);
+    return {
+      turns: messages.filter((message) => message.role === 'user').length,
+      steps,
+      tokens,
+      context: tokens === 0 ? 0 : percent < 1 ? Number(percent.toFixed(1)) : Math.round(percent),
+    };
+  }, [messages]);
   const realMode = Boolean(state.settings.apiKey.trim()) && Boolean(window.olivia?.turn);
 
   const patchMessage = useCallback(
@@ -495,40 +520,10 @@ export function ChatView() {
           </span>
         </div>
         <div className="chat-head-right">
-          <button
-            className={`chip workspace ${task.workspace ? '' : 'unbound'}`}
-            onClick={() => void bindWorkspace()}
-            title={task.workspace ?? '点击绑定工作区目录'}
-          >
-            <Icon name="folder" size={13} />
-            {task.workspace ? basename(task.workspace) : '绑定目录'}
-          </button>
-          <select
-            className="chip select"
-            value={task.approval}
-            onChange={(event) =>
-              changeApproval(event.target.value as (typeof APPROVALS)[number]['value'])
-            }
-            title="审批策略"
-          >
-            {APPROVALS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <select
-            className="chip select"
-            value={task.model}
-            onChange={(event) => changeModel(event.target.value)}
-            title="模型"
-          >
-            {MODELS.map((model) => (
-              <option key={model.id} value={model.id}>
-                {model.label}
-              </option>
-            ))}
-          </select>
+          <span className="chip static" title="当前分支">
+            <Icon name="git" size={13} />
+            {task.branch}
+          </span>
           <button className="icon-btn" title="更多">
             <Icon name="dots" size={16} />
           </button>
@@ -601,12 +596,24 @@ export function ChatView() {
               </button>
             </div>
           )}
-          <Composer value={draft} onChange={setDraft} onSend={send} disabled={streaming} />
-          <div className="chat-note">
-            {realMode
-              ? `已连接 ${modelLabel(state.settings.model)} · 密钥与文件操作都在主进程 · ${state.settings.allowShell ? '命令执行已开启' : '命令执行未开启'}`
-              : '演示模式：未配置密钥，回复由本地脚本回放；配置后走真实工具调用与快照回滚。'}
-          </div>
+          <Composer
+            value={draft}
+            onChange={setDraft}
+            onSend={send}
+            onStop={stop}
+            onModel={changeModel}
+            onApproval={changeApproval}
+            onWorkspace={() => void bindWorkspace()}
+            onNewTask={() => {
+              dispatch({ type: 'addTask', task: createTask(state.settings) });
+            }}
+            onOpenGit={() => navigate('git')}
+            model={task.model}
+            approval={task.approval}
+            workspace={task.workspace}
+            streaming={streaming}
+            stats={stats}
+          />
         </div>
       </div>
     </div>
