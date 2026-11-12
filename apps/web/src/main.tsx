@@ -1,8 +1,8 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
-import './styles/theme.css';
-import './styles/shell.css';
+import './styles/themes/base.css';
+import './styles/themes/legacy.css';
 import './styles/workflow.css';
 import './styles/git.css';
 
