@@ -14,10 +14,13 @@
     "build": "npm run build:web && npm run build:main",
     "start": "npm run build && electron apps/desktop",
     "typecheck": "tsc -p apps/web/tsconfig.json && tsc -p apps/desktop/tsconfig.json",
-    "shot": "electron scripts/capture.cjs",
-    "shot:pages": "electron scripts/capture-pages.cjs",
+    "shot": "node scripts/electron-run.cjs scripts/capture.cjs",
+    "shot:pages": "node scripts/electron-run.cjs scripts/capture-pages.cjs",
+    "test:exec": "node apps/desktop/dist/exec-selftest.cjs",
     "test:wf": "node apps/desktop/dist/wf-selftest.cjs",
-    "e2e:wf": "electron scripts/wf-e2e.cjs",
+    "test": "npm run build:main && npm run test:exec && npm run test:wf",
+    "e2e:wf": "node scripts/electron-run.cjs scripts/wf-e2e.cjs",
+    "e2e:ui": "node scripts/electron-run.cjs scripts/ui-e2e.cjs",
     "mock:llm": "node scripts/mock-llm.cjs"
   },
   "devDependencies": {

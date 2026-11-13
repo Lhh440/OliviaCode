@@ -78,6 +78,23 @@ async function waitForPort(port: number, timeoutMs = 8000): Promise<void> {
   throw new Error('mock 模型端点没有起来');
 }
 
+/** 给运行套一个硬超时：环形工作流若把调度器挂死，这里会返回 null 而不是让自检一起卡住。 */
+async function withTimeoutGuard<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), ms);
+      }),
+    ]);
+  } catch {
+    return null;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 function buildWorkflow(gateTitle: string): { workflow: Workflow; ids: Record<string, string> } {
   const trigger = makeNode({
     kind: 'trigger',
@@ -255,6 +272,56 @@ async function main(): Promise<void> {
     check('B1 拒绝后运行失败', state2.phase === 'failed', `phase=${state2.phase}`);
     check('B2 下游被跳过', state2.nodes[rejected.ids.output!]?.phase === 'skipped', state2.nodes[rejected.ids.output!]?.phase ?? '?');
     check('B3 门只问一次', asked2 === 1, `gates=${asked2}`);
+
+    // —— 场景三：环形工作流必须快速失败，不能把调度器挂死 ——
+    const cyclic = buildWorkflow('环形门');
+    const gateNode = cyclic.workflow.nodes.find((node) => node.id === cyclic.ids.gate)!;
+    const outNode = cyclic.workflow.nodes.find((node) => node.id === cyclic.ids.output)!;
+    cyclic.workflow.edges.push({ id: uid('edge'), from: outNode.id, to: gateNode.id });
+    const state3 = await withTimeoutGuard(
+      runWorkflow({
+        runId: `wf_cycle_${Date.now().toString(36)}`,
+        workflow: cyclic.workflow,
+        workspace: repo,
+        worktreeRoot: path.join(worktrees, 'cycle'),
+        baseUrl: `http://127.0.0.1:${port}/v1`,
+        apiKey: 'sk-mock',
+        model: 'mock-wf',
+        allowShell: false,
+        snapshots: new SnapshotStore(snapshotsDir),
+        emit: () => undefined,
+        requestGate: async () => true,
+        signal: new AbortController().signal,
+      }),
+      15_000,
+    );
+    check('C1 环被检测', state3 !== null && state3.phase === 'failed', state3 ? `phase=${state3.phase}` : '调度器超时挂死');
+    check(
+      'C2 环错误说明清楚',
+      Boolean(state3?.error?.includes('环')),
+      state3?.error?.slice(0, 60) ?? '（无）',
+    );
+
+    // —— 场景四：连线指向不存在的节点，下游跳过且给出原因 ——
+    const broken = buildWorkflow('断链门');
+    broken.workflow.edges.push({ id: uid('edge'), from: 'node_ghost', to: broken.ids.gate! });
+    const state4 = await runWorkflow({
+      runId: `wf_broken_${Date.now().toString(36)}`,
+      workflow: broken.workflow,
+      workspace: repo,
+      worktreeRoot: path.join(worktrees, 'broken'),
+      baseUrl: `http://127.0.0.1:${port}/v1`,
+      apiKey: 'sk-mock',
+      model: 'mock-wf',
+      allowShell: false,
+      snapshots: new SnapshotStore(snapshotsDir),
+      emit: () => undefined,
+      requestGate: async () => true,
+      signal: new AbortController().signal,
+    });
+    check('D1 上游缺失时下游跳过', state4.nodes[broken.ids.gate!]?.phase === 'skipped', state4.nodes[broken.ids.gate!]?.phase ?? '?');
+    check('D2 跳过原因不是静默', Boolean(state4.nodes[broken.ids.gate!]?.summary?.includes('缺失')), state4.nodes[broken.ids.gate!]?.summary ?? '?');
+    check('D3 缺失上游不会谎报成功', state4.phase === 'failed', `phase=${state4.phase}`);
   } finally {
     mock.kill();
     await fs.rm(root, { recursive: true, force: true }).catch(() => undefined);
