@@ -1,0 +1,455 @@
+/* —— M6 扩展页（MCP 服务器 + 团队技能）—— */
+.ext-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 22px 26px 34px;
+  gap: 16px;
+}
+
+.ext-head h1 {
+  margin: 0 0 4px;
+  font-size: 22px;
+  font-family: var(--font-serif, var(--font-sans));
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.ext-head p {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+
+.ext-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 9px 12px;
+  border: 1px solid var(--accent-line);
+  border-radius: 10px;
+  background: var(--accent-soft);
+  font-size: 12.3px;
+  color: var(--text);
+}
+
+.ext-section {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  padding: 14px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ext-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ext-section-head h2 {
+  margin: 0;
+  font-size: 14.5px;
+  color: var(--text);
+}
+
+.ext-hint {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--text-3);
+}
+
+.ext-grid {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.ext-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ext-card {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  text-align: left;
+  min-width: 0;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.ext-card:hover {
+  border-color: var(--line-strong);
+}
+
+.ext-card.active {
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.ext-card-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.ext-card-main b {
+  font-size: 12.6px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ext-card-sub {
+  font-size: 10.6px;
+  font-family: var(--font-mono);
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ext-count {
+  flex-shrink: 0;
+  font-size: 10.4px;
+  color: var(--text-3);
+}
+
+.ext-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--text-3);
+}
+
+.ext-dot.ready {
+  background: var(--green);
+}
+
+.ext-dot.error {
+  background: var(--red);
+}
+
+.ext-dot.connecting {
+  background: var(--amber);
+}
+
+.ext-badge {
+  flex-shrink: 0;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10.2px;
+  border: 1px solid var(--line);
+  color: var(--text-3);
+  background: var(--surface-2);
+}
+
+.ext-badge.ready {
+  color: var(--green);
+  background: var(--green-soft);
+  border-color: var(--green-line);
+}
+
+.ext-badge.error {
+  color: var(--red);
+  background: var(--red-soft);
+  border-color: color-mix(in srgb, var(--red) 30%, transparent);
+}
+
+.ext-badge.connecting {
+  color: var(--amber);
+  background: var(--amber-soft);
+  border-color: var(--amber-line);
+}
+
+.ext-detail {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ext-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ext-detail-head b {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ext-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.ext-error {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--red) 30%, transparent);
+  background: var(--red-soft);
+  color: var(--red);
+  font-size: 11.4px;
+  line-height: 1.55;
+  word-break: break-word;
+}
+
+.ext-instructions {
+  margin: 0;
+  font-size: 11.4px;
+  line-height: 1.6;
+  color: var(--text-2);
+  white-space: pre-wrap;
+}
+
+.ext-warnings {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 11px;
+  color: var(--amber);
+  line-height: 1.55;
+}
+
+.ext-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.ext-tool {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 4px;
+  border-bottom: 1px solid var(--line-soft);
+  min-width: 0;
+}
+
+.ext-tool:last-child {
+  border-bottom: none;
+}
+
+.ext-tool-name {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 11.6px;
+  color: var(--text);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ext-tool-desc {
+  flex: 1;
+  min-width: 0;
+  font-size: 10.9px;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ext-risk {
+  flex-shrink: 0;
+  width: 86px;
+  height: 26px;
+  font-size: 11px;
+}
+
+.ext-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line-strong);
+}
+
+.ext-form-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.ext-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 10.8px;
+  color: var(--text-3);
+  min-width: 150px;
+}
+
+.ext-field.grow {
+  flex: 1;
+  min-width: 240px;
+}
+
+.ext-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* —— 技能 —— */
+.ext-skill-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ext-skills {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ext-skill {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ext-skill.tampered {
+  border-color: color-mix(in srgb, var(--red) 32%, transparent);
+  background: color-mix(in srgb, var(--red-soft) 60%, var(--surface));
+}
+
+.ext-skill-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ext-skill-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.ext-skill-version {
+  font-family: var(--font-mono);
+  font-size: 10.6px;
+  color: var(--text-3);
+}
+
+.ext-skill-desc {
+  margin: 0;
+  font-size: 11.8px;
+  color: var(--text-2);
+  line-height: 1.55;
+}
+
+.ext-skill-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 10.7px;
+  color: var(--text-3);
+}
+
+.ext-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.6px;
+  color: var(--text-2);
+}
+
+.ext-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(12, 10, 14, 0.42);
+  backdrop-filter: blur(3px);
+}
+
+.ext-modal {
+  width: min(720px, calc(100vw - 64px));
+  max-height: 76vh;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.ext-modal header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.ext-modal header b {
+  flex: 1;
+  font-size: 13px;
+}
+
+.ext-modal pre {
+  margin: 0;
+  padding: 14px;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: 11.6px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  color: var(--text-2);
+}
+
+.ext-empty {
+  margin-top: 12vh;
+  text-align: center;
+  color: var(--text-3);
+  font-size: 12.6px;
+}
+
+@media (max-width: 1100px) {
+  .ext-grid {
+    grid-template-columns: 1fr;
+  }
+}

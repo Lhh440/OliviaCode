@@ -5,6 +5,7 @@ import {
   phaseToNodeStatus,
   type NodeRunState,
   type RunPhase,
+  type ToolRegistry,
   type WfNode,
   type Workflow,
   type WorkflowRunEvent,
@@ -46,6 +47,13 @@ export interface WorkflowRuntimeOptions {
   onStep?: (node: WfNode, tool: string, args: unknown) => void;
   /** 额外日志出口（无人值守时没有渲染层在听，需要落盘/通知） */
   onLog?: (line: { at: number; nodeId?: string; kind: WorkflowRunState['logs'][number]['kind']; text: string }) => void;
+  /** M6：工具注册表（内置 + MCP）与技能 */
+  registry?: ToolRegistry;
+  callMcp?: AgentOptions['callMcp'];
+  skillCatalog?: { name: string; description: string }[];
+  loadSkill?: AgentOptions['loadSkill'];
+  /** 无人值守允许的 MCP 服务器；undefined = 不限，[] = 全禁 */
+  mcpServers?: string[];
 }
 
 const KIND_LABEL: Record<WfNode['kind'], string> = {
@@ -419,6 +427,11 @@ export async function runWorkflow(options: WorkflowRuntimeOptions): Promise<Work
             requestPatch: async (input) => input.edits.map((edit) => edit.index),
             gitToken: () => null,
             signal: budget.signal,
+            registry: options.registry,
+            callMcp: options.callMcp,
+            skillCatalog: options.skillCatalog,
+            loadSkill: options.loadSkill,
+            mcpServers: options.mcpServers,
           });
         } finally {
           budget.dispose();
@@ -505,6 +518,12 @@ export async function runWorkflow(options: WorkflowRuntimeOptions): Promise<Work
         requestPatch: async () => null,
         gitToken: () => null,
         signal: budget.signal,
+        registry: options.registry,
+        callMcp: options.callMcp,
+        skillCatalog: options.skillCatalog,
+        loadSkill: options.loadSkill,
+        // 评审节点只读，MCP 工具一律不给（避免评审顺手改外部系统）
+        mcpServers: [],
       });
       if (signal.aborted) {
         setPhase(node.id, 'canceled', { error: '已取消', endedAt: Date.now() });

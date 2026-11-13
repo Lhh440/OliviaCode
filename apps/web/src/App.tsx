@@ -2,6 +2,7 @@ import { Sidebar } from './components/Sidebar';
 import { useRoute } from './router';
 import { StoreProvider } from './store';
 import { ChatView } from './views/Chat';
+import { ExtensionsView } from './views/Extensions';
 import { GitView } from './views/Git';
 import { SchedulesView } from './views/Schedules';
 import { SettingsView } from './views/Settings';
@@ -22,6 +23,7 @@ function Shell() {
           {route === 'chat' && <ChatView />}
           {route === 'workflow' && <WorkflowView />}
           {route === 'schedules' && <SchedulesView />}
+          {route === 'extensions' && <ExtensionsView />}
           {route === 'git' && <GitView />}
           {route === 'settings' && <SettingsView />}
         </main>

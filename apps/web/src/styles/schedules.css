@@ -304,6 +304,20 @@
   color: var(--text-3);
 }
 
+.sch-mcp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.sch-mcp {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.4px;
+  color: var(--text-2);
+}
+
 .sch-runs {
   display: flex;
   flex-direction: column;

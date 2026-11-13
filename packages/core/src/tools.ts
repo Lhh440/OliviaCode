@@ -25,6 +25,11 @@ export interface ToolSpec {
   description: string;
   risk: ToolRisk;
   parameters: JsonSchema;
+  /** mcp 工具来自外部服务器；内置工具不填 */
+  kind?: 'builtin' | 'mcp';
+  serverId?: string;
+  /** MCP 服务器认的原工具名（公开名被 slug 化过） */
+  rawName?: string;
 }
 
 export const TOOLS: ToolSpec[] = [
@@ -162,12 +167,57 @@ export const TOOLS: ToolSpec[] = [
       required: ['title', 'body'],
     },
   },
+  {
+    name: 'use_skill',
+    description:
+      '加载一个团队技能的完整指令（系统提示里只列了技能名与一句话说明）。需要按某套既定流程做事时，先调用它把指令读进来，再动手。',
+    risk: 'read',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: '技能名，见系统提示的技能目录' },
+      },
+      required: ['name'],
+    },
+  },
 ];
 
 export const TOOL_BY_NAME: Map<string, ToolSpec> = new Map(TOOLS.map((tool) => [tool.name, tool]));
 
 export function toolSpec(name: string): ToolSpec | undefined {
   return TOOL_BY_NAME.get(name);
+}
+
+/**
+ * 运行时工具注册表：内置工具 + 已启用的 MCP 工具。
+ *
+ * 内置工具永远优先，MCP 工具的公开名带 `mcp__` 前缀，天然不会覆盖内置工具。
+ * 每次 `tools/list` 变化就重建快照，正在进行的回合沿用旧快照，避免中途换表。
+ */
+export interface RegisteredTool extends ToolSpec {
+  kind: 'builtin' | 'mcp';
+}
+
+export class ToolRegistry {
+  private mcpTools: RegisteredTool[] = [];
+
+  constructor(private readonly builtins: RegisteredTool[] = TOOLS.map((tool) => ({ ...tool, kind: 'builtin' as const }))) {}
+
+  setMcpTools(tools: RegisteredTool[]): void {
+    this.mcpTools = tools.filter((tool) => tool.kind === 'mcp' && !TOOL_BY_NAME.has(tool.name));
+  }
+
+  all(): RegisteredTool[] {
+    return [...this.builtins, ...this.mcpTools];
+  }
+
+  resolve(name: string): RegisteredTool | undefined {
+    return this.builtins.find((tool) => tool.name === name) ?? this.mcpTools.find((tool) => tool.name === name);
+  }
+
+  mcpToolCount(): number {
+    return this.mcpTools.length;
+  }
 }
 
 export function isMutating(name: string): boolean {

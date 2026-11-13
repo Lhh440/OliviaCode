@@ -45,6 +45,7 @@ export function SchedulesView() {
   const [mode, setMode] = useState<ScheduleRecord['mode']>('report');
   const [confirming, setConfirming] = useState<ScheduleRecord | null>(null);
   const [modelSaved, setModelSaved] = useState<boolean | null>(null);
+  const [mcpServers, setMcpServers] = useState<{ id: string; name: string }[]>([]);
   const selectedRef = useRef<string | null>(null);
   selectedRef.current = selectedId;
 
@@ -99,6 +100,12 @@ export function SchedulesView() {
       await load();
     })();
     void window.olivia?.vault.modelStatus().then((status) => setModelSaved(status.saved));
+    void window.olivia?.mcp
+      ?.list()
+      .then(({ configs }) =>
+        setMcpServers(configs.filter((item) => item.enabled).map((item) => ({ id: item.id, name: item.name }))),
+      )
+      .catch(() => undefined);
   }, [sync, load]);
 
   useEffect(() => {
@@ -388,6 +395,36 @@ export function SchedulesView() {
                       onChange={(event) => setPolicy({ ...policy, maxSteps: Number(event.target.value) })}
                     />
                   </label>
+                </div>
+                <div className="sch-field">
+                  <span>允许的 MCP 服务器（无人值守）</span>
+                  {mcpServers.length === 0 ? (
+                    <p className="sch-hint">没有已启用的 MCP 服务器；去「扩展」页添加。</p>
+                  ) : (
+                    <div className="sch-mcp-list">
+                      {mcpServers.map((server) => {
+                        const allowed = (policy.allowedMcpServers ?? []).includes(server.id);
+                        return (
+                          <label key={server.id} className="sch-mcp">
+                            <input
+                              type="checkbox"
+                              checked={allowed}
+                              onChange={(event) =>
+                                setPolicy({
+                                  ...policy,
+                                  allowedMcpServers: event.target.checked
+                                    ? [...(policy.allowedMcpServers ?? []), server.id]
+                                    : (policy.allowedMcpServers ?? []).filter((id) => id !== server.id),
+                                })
+                              }
+                            />
+                            <span>{server.name || server.id}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <p className="sch-hint">默认全不选：没人看着的时候，MCP 工具一律不可用。</p>
                 </div>
                 <p className="sch-hint">任一上限触发即判定失败并停止，不会推送、不会开 PR。</p>
                 <button className="btn primary" disabled={busy} onClick={() => void savePolicy()}>

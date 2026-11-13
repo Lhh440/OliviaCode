@@ -59,6 +59,8 @@ export function WorkflowView() {
   const [runInfo, setRunInfo] = useState<WorkflowRunState | null>(null);
   const [gate, setGate] = useState<GatePrompt | null>(null);
   const [panelOpen, setPanelOpen] = useState(true);
+  /** M6：已连接的 MCP 服务器，节点可以整台放行 */
+  const [mcpServers, setMcpServers] = useState<string[]>([]);
 
   const canvasRef = useRef<CanvasHandle>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -86,6 +88,13 @@ export function WorkflowView() {
     }, 280);
     return () => clearTimeout(timer);
   }, [wf, workspace]);
+
+  useEffect(() => {
+    void window.olivia?.mcp
+      ?.list()
+      .then(({ configs }) => setMcpServers(configs.filter((item) => item.enabled).map((item) => item.id)))
+      .catch(() => undefined);
+  }, []);
 
   const applyRunEvent = useCallback((event: WorkflowRunEvent) => {
     if (event.type === 'run.start') {
@@ -549,6 +558,7 @@ export function WorkflowView() {
 
       <Inspector
         node={selected}
+        mcpServers={mcpServers}
         onPatch={(patch) => {
           if (selectedId) patchNode(selectedId, patch);
         }}

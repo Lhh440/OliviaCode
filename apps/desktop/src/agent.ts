@@ -1,9 +1,7 @@
 import {
-  TOOLS,
+  ToolRegistry,
   describeCall,
   diffText,
-  isMutating,
-  toolSpec,
   type ApprovalDecision,
   type ApprovalMode,
   type ApprovalRequest,
@@ -11,7 +9,9 @@ import {
   type Part,
   type PatchDecision,
   type PatchEditPreview,
+  type RegisteredTool,
   type SessionEvent,
+  type ToolSpec,
   type TurnEvent,
 } from '@olivia/core';
 import {
@@ -81,11 +81,31 @@ export interface AgentOptions {
   }) => Promise<PatchDecision>;
   gitToken: (provider: GitProvider) => string | null;
   signal: AbortSignal;
-  /** 允许这个节点调用的工具白名单；不传表示全部可用（普通对话）。 */
+  /** 允许这个节点调用的工具白名单；不传表示全部可用（普通对话）。`mcp:<server>` 可放行整个服务器 */
   tools?: string[];
+  /** 运行时工具注册表（内置 + MCP）；不传则只用内置工具 */
+  registry?: ToolRegistry;
+  /** 调用 MCP 工具：公开名 → 结果 */
+  callMcp?: (
+    name: string,
+    args: Record<string, unknown>,
+  ) => Promise<{ ok: boolean; text: string; summary: string; rows?: string[] }>;
+  /** 系统提示里的技能目录（只有名字与一句话） */
+  skillCatalog?: { name: string; description: string }[];
+  /** use_skill 的实际加载 */
+  loadSkill?: (name: string) => Promise<{ ok: boolean; text?: string; error?: string }>;
+  /** 无人值守时允许的 MCP 服务器；undefined = 不限制（交互式），[] = 全禁 */
+  mcpServers?: string[];
 }
-
-function systemPrompt(root: string, tree: string[]): string {
+function systemPrompt(root: string, tree: string[], skills: { name: string; description: string }[]): string {
+  const skillSection =
+    skills.length > 0
+      ? [
+          '',
+          '可用技能（这里只有名字；需要按某套既定流程做事时，先调用 use_skill 把完整指令读进来）：',
+          ...skills.slice(0, 30).map((skill) => `- ${skill.name}：${skill.description}`),
+        ].join('\n')
+      : '';
   return [
     '你是 OliviaCode 的编程助手，运行在用户本机的桌面客户端里，可以直接读写工作区、执行命令。',
     `工作区根目录：${root}`,
@@ -97,6 +117,7 @@ function systemPrompt(root: string, tree: string[]): string {
     '3. 改完代码自己跑一遍相关测试（run_command），失败就修，不要留 TODO 交差。',
     '4. 不要执行破坏性命令（删除仓库、git push --force、重置工作区），除非用户明确要求。',
     '5. 用简体中文回答：先给结论，再列改了什么、验证结果；不要复述整段文件内容。',
+    skillSection,
   ]
     .filter(Boolean)
     .join('\n');
@@ -138,12 +159,11 @@ async function streamCompletion(
     signal: AbortSignal;
     onText: (delta: string) => void;
     onThinking: (delta: string) => void;
-    tools?: string[];
+    specs: ToolSpec[];
   },
 ): Promise<Completion> {
   const url = `${options.baseUrl.replace(/\/+$/, '')}/chat/completions`;
-  const allowed = options.tools;
-  const specs = allowed ? TOOLS.filter((tool) => allowed.includes(tool.name)) : TOOLS;
+  const specs = options.specs;
   const response = await fetch(url, {
     method: 'POST',
     signal: options.signal,
@@ -436,9 +456,36 @@ async function executeTool(
         rows: [result.url ?? ''],
       };
     }
+    case 'use_skill': {
+      const name = String(args.name ?? '').trim();
+      if (!options.loadSkill) throw new Error('当前没有可用的技能');
+      const loaded = await options.loadSkill(name);
+      if (!loaded.ok) throw new Error(loaded.error ?? `加载技能 ${name} 失败`);
+      return {
+        status: 'ok',
+        text: loaded.text ?? '',
+        summary: `已加载技能 ${name}`,
+        rows: [name],
+      };
+    }
     default:
       throw new Error(`未知工具：${name}`);
   }
+}
+
+async function executeMcpTool(
+  options: AgentOptions,
+  spec: RegisteredTool,
+  args: Record<string, unknown>,
+): Promise<ExecutedTool> {
+  if (!options.callMcp) throw new Error(`MCP 工具 ${spec.name} 当前不可用（没有连接管理器）`);
+  const result = await options.callMcp(spec.name, args);
+  return {
+    status: result.ok ? 'ok' : 'error',
+    text: result.text,
+    summary: result.summary,
+    rows: result.rows ?? [],
+  };
 }
 
 /** 把流式事件折叠成可落盘的 parts，重放时能还原同样的界面。 */
@@ -575,10 +622,27 @@ async function runAgentLoop(options: AgentOptions): Promise<void> {
   }
 
   const messages: ApiMessage[] = [
-    { role: 'system', content: systemPrompt(policy.root, tree) },
+    { role: 'system', content: systemPrompt(policy.root, tree, options.skillCatalog ?? []) },
     ...options.history.slice(-12),
     { role: 'user', content: options.prompt },
   ];
+
+  const registry = options.registry ?? new ToolRegistry();
+
+  /** 节点级白名单：内置工具按名；MCP 工具可以按名，也可以按 `mcp:<server>` 整台放行。 */
+  const allowedByNode = (spec: RegisteredTool): boolean => {
+    if (!options.tools) return true;
+    if (options.tools.includes(spec.name)) return true;
+    if (spec.kind === 'mcp' && spec.serverId) return options.tools.includes(`mcp:${spec.serverId}`);
+    return false;
+  };
+  /** 无人值守：MCP 工具默认全禁，只有计划里逐服务器放行的才可用。 */
+  const allowedUnattended = (spec: RegisteredTool): boolean => {
+    if (spec.kind !== 'mcp') return true;
+    if (options.mcpServers === undefined) return true;
+    return Boolean(spec.serverId && options.mcpServers.includes(spec.serverId));
+  };
+  const specs = registry.all().filter((spec) => allowedByNode(spec) && allowedUnattended(spec));
 
   const policyFile = await loadPolicy(policy.root);
   let toolErrors = 0;
@@ -593,7 +657,7 @@ async function runAgentLoop(options: AgentOptions): Promise<void> {
       signal: options.signal,
       onText: (delta) => emit({ type: 'text', delta }),
       onThinking: (delta) => emit({ type: 'thinking', delta }),
-      tools: options.tools,
+      specs,
     });
 
     if (completion.toolCalls.length === 0) return;
@@ -624,10 +688,13 @@ async function runAgentLoop(options: AgentOptions): Promise<void> {
         continue;
       }
 
-      const spec = toolSpec(call.name);
-      const blocked = Boolean(spec && options.tools && !options.tools.includes(spec.name));
-      const detail = describeCall(call.name, args);
-      const mutating = spec ? isMutating(call.name) : false;
+      const spec = registry.resolve(call.name);
+      const blocked = Boolean(spec && (!allowedByNode(spec) || !allowedUnattended(spec)));
+      const detail =
+        spec?.kind === 'mcp'
+          ? `${spec.serverId} · ${spec.rawName}`
+          : describeCall(call.name, args);
+      const mutating = spec ? spec.risk === 'write' || spec.risk === 'exec' : false;
       const allowedByPolicy = spec ? policyAllows(policyFile, call.name, args) : false;
       const isPatch = call.name === 'apply_patch';
       const approvalMode = options.approval;
@@ -663,7 +730,9 @@ async function runAgentLoop(options: AgentOptions): Promise<void> {
         decision = 'reject';
       } else if (blocked) {
         decision = 'reject';
-        blockedReason = `这个节点没有被授予 ${call.name} 权限（可用：${(options.tools ?? []).join(' / ') || '无'}），换个做法或者跳过。`;
+        blockedReason = !allowedUnattended(spec!)
+          ? `无人值守运行没有放行 MCP 服务器「${spec!.serverId}」，这个工具不可用。`
+          : `这个节点没有被授予 ${call.name} 权限（可用：${(options.tools ?? []).join(' / ') || '无'}），换个做法或者跳过。`;
       } else if (patchMode === 'interactive' || patchMode === 'queued') {
         // 先出预览：逐处接受模式等你勾选；自动放行模式展示后直接应用
         try {
@@ -758,7 +827,9 @@ async function runAgentLoop(options: AgentOptions): Promise<void> {
       }
 
       try {
-        const result = await executeTool(options, call.name, args, call.id, log, acceptedEdits);
+        const result = spec?.kind === 'mcp'
+          ? await executeMcpTool(options, spec, args)
+          : await executeTool(options, call.name, args, call.id, log, acceptedEdits);
         emit({
           type: 'tool.result',
           callId: call.id,

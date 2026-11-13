@@ -7,6 +7,8 @@ interface Props {
   onPatch: (patch: Partial<WfNode>) => void;
   onDelete: () => void;
   onInsert: () => void;
+  /** M6：已连接的 MCP 服务器 id，节点可以按 `mcp:<id>` 整台放行 */
+  mcpServers?: string[];
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -18,7 +20,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-export function Inspector({ node, onPatch, onDelete, onInsert }: Props) {
+export function Inspector({ node, onPatch, onDelete, onInsert, mcpServers = [] }: Props) {
   if (!node) {
     return (
       <aside className="wf-inspector empty">
@@ -145,7 +147,28 @@ export function Inspector({ node, onPatch, onDelete, onInsert }: Props) {
                     </button>
                   );
                 })}
+                {mcpServers.map((serverId) => {
+                  const key = `mcp:${serverId}`;
+                  const enabled = tools.includes(key);
+                  return (
+                    <button
+                      key={key}
+                      className={`tool-chip ${enabled ? 'on' : ''}`}
+                      title="放行这整台 MCP 服务器（工具本身还要在「扩展」页勾选）"
+                      onClick={() =>
+                        onPatch({
+                          tools: enabled ? tools.filter((item) => item !== key) : [...tools, key],
+                        })
+                      }
+                    >
+                      {key}
+                    </button>
+                  );
+                })}
               </div>
+              {mcpServers.length === 0 && (
+                <p className="field-hint">在「扩展」页连上 MCP 服务器后，这里会出现 mcp:&lt;服务器&gt; 芯片。</p>
+              )}
             </div>
 
             <div className="field-row">

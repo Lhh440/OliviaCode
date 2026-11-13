@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { nextOccurrence, tryParseCron, type RunRecord, type ScheduleRecord, type SchedulerEvent, type WorkflowRunState } from '@olivia/core';
+import { nextOccurrence, tryParseCron, type McpToolResult, type RunRecord, type ScheduleRecord, type SchedulerEvent, type ToolRegistry, type WorkflowRunState } from '@olivia/core';
 import type { SnapshotStore } from '@olivia/exec';
 import { git, isRepo, pushBranch, readStatus } from './git';
 import { createPullRequest } from './providers';
@@ -38,6 +38,16 @@ export interface SchedulerDeps {
   notify?: (title: string, body: string) => void;
   now?: () => number;
   tickMs?: number;
+  /** M6：无人值守可用的 MCP（默认策略会全禁，逐服务器放行） */
+  mcp?: {
+    createRegistry: () => ToolRegistry;
+    callMcp: (name: string, args: Record<string, unknown>) => Promise<McpToolResult>;
+  };
+  /** M6：技能（工具放行由技能自身 requires 校验） */
+  skills?: {
+    catalog: (workspace: string) => Promise<{ name: string; description: string }[]>;
+    load: (workspace: string, name: string) => Promise<{ ok: boolean; text?: string; error?: string }>;
+  };
 }
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -375,6 +385,14 @@ export class Scheduler {
         signal: abort.signal,
         budget: { maxWallMinutes: record.policy.maxWallMinutes, maxSteps: record.policy.maxSteps },
         gatePolicy: record.policy.gate,
+        // M6：无人值守默认禁止 MCP，只有计划里逐服务器放行的才可用
+        registry: this.deps.mcp?.createRegistry(),
+        callMcp: this.deps.mcp?.callMcp,
+        skillCatalog: this.deps.skills ? await this.deps.skills.catalog(record.workspace) : [],
+        loadSkill: this.deps.skills
+          ? (name) => this.deps.skills!.load(record.workspace, name)
+          : undefined,
+        mcpServers: record.policy.allowedMcpServers ?? [],
         // pause-and-notify：没人应答，等到 TTL 后按未通过处理
         requestGate: async () => {
           this.deps.notify?.(
@@ -496,6 +514,9 @@ function validatePolicyNumbers(policy: ScheduleRecord['policy']): string | null 
   }
   if (!Number.isFinite(policy.maxSteps) || policy.maxSteps < 1 || policy.maxSteps > 1000) {
     return '步数上限要在 1–1000 之间';
+  }
+  if (policy.allowedMcpServers !== undefined && !Array.isArray(policy.allowedMcpServers)) {
+    return '允许的 MCP 服务器必须是数组';
   }
   return null;
 }

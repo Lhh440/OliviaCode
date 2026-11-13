@@ -4,8 +4,12 @@ import type {
   GitPrResult,
   GitProvider,
   GitRepoState,
+  McpRisk,
+  McpServerConfig,
+  McpServerState,
   RunRecord,
   ScheduleRecord,
+  SkillInfo,
   TurnEnvelope,
   TurnStartArgs,
   UndoResult,
@@ -86,6 +90,39 @@ declare global {
         cancel: (id: string) => void;
         openReport: (filePath: string) => Promise<{ ok: boolean; error?: string }>;
         onEvent: (listener: (event: unknown) => void) => () => void;
+      };
+      mcp: {
+        list: () => Promise<{ configs: McpServerConfig[]; states: McpServerState[] }>;
+        save: (
+          input: Partial<McpServerConfig> & { id?: string },
+        ) => Promise<{ ok: boolean; error?: string; config?: McpServerConfig }>;
+        remove: (id: string) => Promise<{ ok: boolean }>;
+        enable: (id: string, enabled: boolean) => Promise<McpServerState | null>;
+        connect: (id: string) => Promise<McpServerState | null>;
+        refresh: (id: string) => Promise<McpServerState | null>;
+        disconnect: (id: string) => Promise<{ ok: boolean }>;
+        setRisk: (id: string, tool: string, risk: McpRisk | null) => Promise<McpServerState | null>;
+        setSecret: (key: string, value: string) => Promise<{ ok: boolean; message?: string }>;
+        onEvent: (listener: (state: McpServerState) => void) => () => void;
+      };
+      skills: {
+        pick: () => Promise<string | null>;
+        list: (workspace: string) => Promise<SkillInfo[]>;
+        install: (
+          workspace: string,
+          dir: string,
+        ) => Promise<{ ok: boolean; skill?: SkillInfo; error?: string }>;
+        enable: (
+          workspace: string,
+          name: string,
+          enabled: boolean,
+        ) => Promise<{ ok: boolean; error?: string }>;
+        confirm: (workspace: string, name: string) => Promise<{ ok: boolean; error?: string }>;
+        uninstall: (workspace: string, name: string) => Promise<{ ok: boolean; error?: string }>;
+        load: (
+          workspace: string,
+          name: string,
+        ) => Promise<{ ok: boolean; text?: string; error?: string }>;
       };
       git: {
         pickDir: () => Promise<string | null>;

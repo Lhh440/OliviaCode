@@ -2,6 +2,8 @@ export * from './types';
 export * from './workflow';
 export * from './workflow-run';
 export * from './schedule';
+export * from './mcp';
+export * from './skill';
 export * from './tools';
 export * from './session';
 export * from './diff';

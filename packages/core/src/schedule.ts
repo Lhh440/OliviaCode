@@ -26,6 +26,8 @@ export interface UnattendedPolicy {
   maxNodes: number;
   /** 单次运行模型步数上限 */
   maxSteps: number;
+  /** 允许在无人值守时使用的 MCP 服务器；默认空 = 一律禁止 */
+  allowedMcpServers: string[];
 }
 
 export const DEFAULT_UNATTENDED_POLICY: UnattendedPolicy = {
@@ -34,6 +36,7 @@ export const DEFAULT_UNATTENDED_POLICY: UnattendedPolicy = {
   maxWallMinutes: 30,
   maxNodes: 24,
   maxSteps: 80,
+  allowedMcpServers: [],
 };
 
 export type RunStatus = 'running' | 'done' | 'failed' | 'canceled' | 'skipped' | 'interrupted';

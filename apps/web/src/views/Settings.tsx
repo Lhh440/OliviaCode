@@ -420,7 +420,7 @@ export function SettingsView() {
           <Section icon="layers" title="关于" desc="本地优先的 AI 编程工作站。">
             <div className="divide-y divide-light-line dark:divide-dark-line">
               {[
-                { label: '版本', value: '0.6.0 · M2+M3+M4+M5' },
+                { label: '版本', value: '0.7.0 · M2+M3+M4+M5+M6' },
                 {
                   label: '运行形态',
                   value: typeof window !== 'undefined' && 'olivia' in window ? 'Electron 桌面端' : '浏览器预览',

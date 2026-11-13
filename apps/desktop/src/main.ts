@@ -1,18 +1,21 @@
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, Notification, shell } from 'electron';
 import path from 'node:path';
-import type {
-  ApprovalDecision,
-  GitProvider,
-  PatchDecision,
-  RunRecord,
-  ScheduleRecord,
-  SchedulerEvent,
-  TurnEnvelope,
-  TurnEvent,
-  TurnStartArgs,
-  UnattendedPolicy,
-  WorkflowRunArgs,
-  WorkflowRunEvent,
+import {
+  ToolRegistry,
+  type ApprovalDecision,
+  type GitProvider,
+  type McpRisk,
+  type McpServerConfig,
+  type PatchDecision,
+  type RunRecord,
+  type ScheduleRecord,
+  type SchedulerEvent,
+  type TurnEnvelope,
+  type TurnEvent,
+  type TurnStartArgs,
+  type UnattendedPolicy,
+  type WorkflowRunArgs,
+  type WorkflowRunEvent,
 } from '@olivia/core';
 import { SnapshotStore, type Policy } from '@olivia/exec';
 import { runAgentTurn } from './agent';
@@ -34,11 +37,13 @@ import {
   stagePaths,
   unstagePaths,
 } from './git';
+import { McpManager } from './mcp-manager';
 import { createPullRequest } from './providers';
 import { Scheduler } from './scheduler';
 import { SchedulerStore } from './scheduler-store';
 import type { SyncInput } from './schedule-sync';
 import { SessionStore } from './sessions';
+import { SkillStore } from './skill-store';
 import { checkWorkspace } from './workspace';
 import * as vault from './vault';
 import { runWorkflow } from './workflow-runner';
@@ -51,8 +56,24 @@ let mainWindow: BrowserWindow | null = null;
 let sessions: SessionStore;
 let snapshots: SnapshotStore;
 let scheduler: Scheduler | null = null;
+let mcp: McpManager | null = null;
+let skills: SkillStore | null = null;
 
 const reportsDir = (): string => path.join(app.getPath('userData'), 'reports');
+
+/** 每次拿一份新的工具快照：MCP 工具勾选随时可能变。 */
+function buildRegistry(): ToolRegistry {
+  const registry = new ToolRegistry();
+  registry.setMcpTools(mcp?.registryTools() ?? []);
+  return registry;
+}
+
+/** 向所有窗口广播（MCP 连接状态、技能变更等）。 */
+function broadcast(channel: string, payload: unknown): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) win.webContents.send(channel, payload);
+  }
+}
 
 interface TurnContext {
   abort: AbortController;
@@ -216,6 +237,14 @@ ipcMain.handle('olivia:turn.start', async (event, args: TurnStartArgs & { turnId
 
   const policy: Policy = { mode: 'workspace-write', root: args.workspace };
 
+  // 固定住本轮引用的管理器实例（模块级变量可能在 await 期间被替换）
+  const mcpManager = mcp;
+  const skillStore = skills;
+  // M6：本轮可用的工具 = 内置 + 已勾选的 MCP 工具；技能目录只放名字
+  const registry = new ToolRegistry();
+  registry.setMcpTools(mcpManager?.registryTools() ?? []);
+  const skillCatalog = skillStore ? await skillStore.catalog(args.workspace) : [];
+
   void (async () => {
     let ok = true;
     let failure: string | undefined;
@@ -234,6 +263,10 @@ ipcMain.handle('olivia:turn.start', async (event, args: TurnStartArgs & { turnId
         snapshots,
         sessions,
         emit,
+        registry,
+        callMcp: mcpManager ? (name, toolArgs) => mcpManager.callTool(name, toolArgs) : undefined,
+        skillCatalog,
+        loadSkill: skillStore ? (name) => skillStore.load(args.workspace, name) : undefined,
         gitToken: (provider) => vault.token(provider),
         signal: abort.signal,
         requestApproval: (request) =>
@@ -325,6 +358,9 @@ ipcMain.handle(
     const gates = new Map<string, (approved: boolean) => void>();
     workflowRuns.set(args.runId, { abort: controller, gates });
     const sender = event.sender;
+    const mcpManager = mcp;
+    const skillStore = skills;
+    const skillCatalog = skillStore ? await skillStore.catalog(args.workspace) : [];
     const emit = (workflowEvent: WorkflowRunEvent): void => {
       if (!sender.isDestroyed()) {
         sender.send('olivia:workflow.event', { runId: args.runId, event: workflowEvent });
@@ -344,6 +380,10 @@ ipcMain.handle(
       snapshots,
       emit,
       signal: controller.signal,
+      registry: buildRegistry(),
+      callMcp: mcpManager ? (name, toolArgs) => mcpManager.callTool(name, toolArgs) : undefined,
+      skillCatalog,
+      loadSkill: skillStore ? (name) => skillStore.load(args.workspace, name) : undefined,
       requestGate: (node) =>
         new Promise<boolean>((resolve) => {
           // 节点上的 timeout 是分钟；默认 30 分钟，超时按拒绝处理（并留一条日志）
@@ -627,10 +667,94 @@ ipcMain.handle(
   },
 );
 
-app.whenReady().then(() => {
+// —— M6：MCP 服务器 ——
+ipcMain.handle('olivia:mcp.list', async () => ({
+  configs: mcp?.listConfigs() ?? [],
+  states: mcp?.allStates() ?? [],
+}));
+ipcMain.handle('olivia:mcp.save', async (_event, input: Partial<McpServerConfig> & { id?: string }) =>
+  mcp ? await mcp.saveConfig(input) : { ok: false, error: 'MCP 管理器还没启动' },
+);
+ipcMain.handle('olivia:mcp.remove', async (_event, id: string) => {
+  await mcp?.remove(id);
+  return { ok: true };
+});
+ipcMain.handle('olivia:mcp.enable', async (_event, args: { id: string; enabled: boolean }) =>
+  mcp ? await mcp.setEnabled(args.id, args.enabled) : null,
+);
+ipcMain.handle('olivia:mcp.connect', async (_event, id: string) => (mcp ? await mcp.connect(id) : null));
+ipcMain.handle('olivia:mcp.refresh', async (_event, id: string) => (mcp ? await mcp.refresh(id) : null));
+ipcMain.handle('olivia:mcp.disconnect', async (_event, id: string) => {
+  await mcp?.disconnectServer(id);
+  return { ok: true };
+});
+ipcMain.handle(
+  'olivia:mcp.risk',
+  async (_event, args: { id: string; tool: string; risk: McpRisk | null }) =>
+    mcp ? await mcp.setToolRisk(args.id, args.tool, args.risk) : null,
+);
+ipcMain.handle('olivia:mcp.secret', async (_event, args: { key: string; value: string }) => {
+  try {
+    vault.setSecret(args.key, args.value);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : String(error) };
+  }
+});
+
+// —— M6：团队技能 ——
+ipcMain.handle('olivia:skills.pick', async () => {
+  const result = await dialog.showOpenDialog({ title: '选择技能目录（含 SKILL.md）', properties: ['openDirectory'] });
+  return result.canceled || result.filePaths.length === 0 ? null : result.filePaths[0];
+});
+ipcMain.handle('olivia:skills.list', async (_event, workspace: string) =>
+  skills && workspace ? await skills.scan(workspace) : [],
+);
+ipcMain.handle('olivia:skills.install', async (_event, args: { workspace: string; dir: string }) =>
+  skills ? await skills.install(args.workspace, args.dir) : { ok: false, error: '技能管理器还没启动' },
+);
+ipcMain.handle(
+  'olivia:skills.enable',
+  async (_event, args: { workspace: string; name: string; enabled: boolean }) =>
+    skills ? await skills.setEnabled(args.workspace, args.name, args.enabled) : { ok: false, error: '未初始化' },
+);
+ipcMain.handle('olivia:skills.confirm', async (_event, args: { workspace: string; name: string }) =>
+  skills ? await skills.confirm(args.workspace, args.name) : { ok: false, error: '未初始化' },
+);
+ipcMain.handle('olivia:skills.uninstall', async (_event, args: { workspace: string; name: string }) =>
+  skills ? await skills.uninstall(args.workspace, args.name) : { ok: false, error: '未初始化' },
+);
+ipcMain.handle('olivia:skills.load', async (_event, args: { workspace: string; name: string }) =>
+  skills ? await skills.load(args.workspace, args.name) : { ok: false, error: '未初始化' },
+);
+
+app.whenReady().then(async () => {
   sessions = new SessionStore(path.join(app.getPath('userData'), 'sessions'));
   snapshots = new SnapshotStore(path.join(app.getPath('userData'), 'snapshots'));
   nativeTheme.themeSource = 'light';
+
+  /**
+   * M6：MCP 连接管理器。配置在机器级（不进仓库），密钥引用走保险箱；
+   * 勾选了风险的工具才会暴露给模型。
+   */
+  mcp = new McpManager({
+    file: path.join(app.getPath('userData'), 'mcp.json'),
+    artifactsDir: path.join(app.getPath('userData'), 'artifacts'),
+    resolveSecret: (reference) => {
+      const match = reference.match(/^vault:(.+)$/);
+      return match ? vault.secret(match[1]!) : null;
+    },
+    log: (line) => console.log(line),
+    onChange: (state) => broadcast('olivia:mcp.event', state),
+  });
+  await mcp.load();
+  void mcp.connectAll();
+
+  /** M6：技能（工作区 `.olivia/skills` 随仓库走；个人技能在应用数据目录）。 */
+  skills = new SkillStore({
+    stateFile: path.join(app.getPath('userData'), 'skill-state.json'),
+    personalDir: path.join(app.getPath('userData'), 'skills'),
+  });
 
   /**
    * M5 调度器：常驻主进程，关掉窗口也照跑。
@@ -642,6 +766,18 @@ app.whenReady().then(() => {
     snapshots,
     worktreeRoot: path.join(app.getPath('userData'), 'worktrees'),
     reportsDir: reportsDir(),
+    mcp: {
+      createRegistry: buildRegistry,
+      callMcp: (name, toolArgs) =>
+        mcp
+          ? mcp.callTool(name, toolArgs)
+          : Promise.resolve({ ok: false, text: 'MCP 管理器未启动', summary: '不可用' }),
+    },
+    skills: {
+      catalog: (workspace) => (skills ? skills.catalog(workspace) : Promise.resolve([])),
+      load: (workspace, name) =>
+        skills ? skills.load(workspace, name) : Promise.resolve({ ok: false, error: '技能管理器未启动' }),
+    },
     resolveCredentials: () => {
       const saved = vault.modelCredential();
       if (saved) return saved;
@@ -680,6 +816,7 @@ app.whenReady().then(() => {
 
 app.on('before-quit', () => {
   scheduler?.stop();
+  mcp?.stopAll();
 });
 
 app.on('window-all-closed', () => {

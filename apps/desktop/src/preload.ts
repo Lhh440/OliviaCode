@@ -22,7 +22,7 @@ try {
 }
 
 contextBridge.exposeInMainWorld('olivia', {
-  version: '0.6.0',
+  version: '0.7.0',
   platform: process.platform,
   desktop: true,
   env,
@@ -116,6 +116,39 @@ contextBridge.exposeInMainWorld('olivia', {
       ipcRenderer.on('olivia:schedules.event', handler);
       return () => ipcRenderer.removeListener('olivia:schedules.event', handler);
     },
+  },
+  mcp: {
+    list: (): Promise<unknown> => ipcRenderer.invoke('olivia:mcp.list'),
+    save: (input: unknown): Promise<unknown> => ipcRenderer.invoke('olivia:mcp.save', input),
+    remove: (id: string): Promise<unknown> => ipcRenderer.invoke('olivia:mcp.remove', id),
+    enable: (id: string, enabled: boolean): Promise<unknown> =>
+      ipcRenderer.invoke('olivia:mcp.enable', { id, enabled }),
+    connect: (id: string): Promise<unknown> => ipcRenderer.invoke('olivia:mcp.connect', id),
+    refresh: (id: string): Promise<unknown> => ipcRenderer.invoke('olivia:mcp.refresh', id),
+    disconnect: (id: string): Promise<unknown> => ipcRenderer.invoke('olivia:mcp.disconnect', id),
+    setRisk: (id: string, tool: string, risk: string | null): Promise<unknown> =>
+      ipcRenderer.invoke('olivia:mcp.risk', { id, tool, risk }),
+    setSecret: (key: string, value: string): Promise<unknown> =>
+      ipcRenderer.invoke('olivia:mcp.secret', { key, value }),
+    onEvent: (listener: (state: unknown) => void): (() => void) => {
+      const handler = (_event: unknown, state: unknown): void => listener(state);
+      ipcRenderer.on('olivia:mcp.event', handler);
+      return () => ipcRenderer.removeListener('olivia:mcp.event', handler);
+    },
+  },
+  skills: {
+    pick: (): Promise<string | null> => ipcRenderer.invoke('olivia:skills.pick'),
+    list: (workspace: string): Promise<unknown> => ipcRenderer.invoke('olivia:skills.list', workspace),
+    install: (workspace: string, dir: string): Promise<unknown> =>
+      ipcRenderer.invoke('olivia:skills.install', { workspace, dir }),
+    enable: (workspace: string, name: string, enabled: boolean): Promise<unknown> =>
+      ipcRenderer.invoke('olivia:skills.enable', { workspace, name, enabled }),
+    confirm: (workspace: string, name: string): Promise<unknown> =>
+      ipcRenderer.invoke('olivia:skills.confirm', { workspace, name }),
+    uninstall: (workspace: string, name: string): Promise<unknown> =>
+      ipcRenderer.invoke('olivia:skills.uninstall', { workspace, name }),
+    load: (workspace: string, name: string): Promise<unknown> =>
+      ipcRenderer.invoke('olivia:skills.load', { workspace, name }),
   },
   git: {
     pickDir: (): Promise<string | null> => ipcRenderer.invoke('olivia:git.pick-dir'),

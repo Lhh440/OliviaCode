@@ -1,6 +1,6 @@
 {
   "name": "oliviacode",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "description": "OliviaCode — 本地优先的 AI 编程工作站",
   "workspaces": [
@@ -19,7 +19,9 @@
     "test:exec": "node apps/desktop/dist/exec-selftest.cjs",
     "test:wf": "node apps/desktop/dist/wf-selftest.cjs",
     "test:sched": "node apps/desktop/dist/scheduler-selftest.cjs",
-    "test": "npm run build:main && npm run test:exec && npm run test:wf && npm run test:sched",
+    "test:mcp": "node apps/desktop/dist/mcp-selftest.cjs",
+    "test:skill": "node apps/desktop/dist/skill-selftest.cjs",
+    "test": "npm run build:main && npm run test:exec && npm run test:wf && npm run test:sched && npm run test:mcp && npm run test:skill",
     "e2e:wf": "node scripts/electron-run.cjs scripts/wf-e2e.cjs",
     "e2e:ui": "node scripts/electron-run.cjs scripts/ui-e2e.cjs",
     "mock:llm": "node scripts/mock-llm.cjs"

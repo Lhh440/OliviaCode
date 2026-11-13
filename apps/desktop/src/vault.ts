@@ -14,6 +14,8 @@ interface VaultData {
     apiKey: string;
     model: string;
   };
+  /** 通用密钥（MCP 请求头等），键名由调用方约定 */
+  secrets?: Record<string, string>;
 }
 
 function vaultPath(): string {
@@ -112,4 +114,23 @@ export function modelStatus(): { saved: boolean; baseUrl: string; model: string 
     baseUrl: credential?.baseUrl ?? '',
     model: credential?.model ?? '',
   };
+}
+
+// —— 通用密钥（MCP 请求头等）——
+
+export function secret(key: string): string | null {
+  return read().secrets?.[key] ?? null;
+}
+
+export function setSecret(key: string, value: string): void {
+  const data = read();
+  const secrets = { ...(data.secrets ?? {}) };
+  if (value) secrets[key] = value;
+  else delete secrets[key];
+  data.secrets = secrets;
+  write(data);
+}
+
+export function secretKeys(): string[] {
+  return Object.keys(read().secrets ?? {});
 }

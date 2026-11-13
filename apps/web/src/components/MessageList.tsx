@@ -78,7 +78,9 @@ function ToolCard({ run }: { run: ToolRun }) {
           <Icon name={TOOL_ICON[run.name] ?? 'terminal'} size={12} />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-[12px] font-mono text-light-ink dark:text-dark-ink truncate">{run.name}</span>
+          <span className="block text-[12px] font-mono text-light-ink dark:text-dark-ink truncate">
+            {run.name.startsWith('mcp__') ? run.name.slice(5).replace('__', ' · ') : run.name}
+          </span>
           <span className="block text-[11px] text-light-inkFaint dark:text-dark-inkFaint truncate">{run.detail}</span>
         </span>
         <span className="shrink-0 flex items-center gap-2">
