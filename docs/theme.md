@@ -47,5 +47,5 @@ electron scripts/capture-v2.cjs           # 带对话态的整套截图，需要
 ## 验证
 
 - `npm run typecheck`：前端 + 主进程严格检查通过。
-- `npm run build:web`：494 个模块，CSS 64.8 kB（gzip 12.1 kB）。
+- `npm run build:web`：496 个模块，CSS 66.0 kB（gzip 12.4 kB）。
 - 四套皮肤在 1480×940 下逐页截图核对，见 `docs/screenshots-v3/`。

@@ -434,7 +434,7 @@
   position: absolute;
   left: 50%;
   bottom: 60px;
-  z-index: 9;
+  z-index: 60;
   transform: translateX(-50%);
   padding: 7px 13px;
   border-radius: 999px;
