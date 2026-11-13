@@ -104,7 +104,7 @@ export function ChatView() {
         if (part.kind === 'text') chars += part.text.length;
         if (part.kind === 'thinking') chars += part.text.length;
         if (part.kind === 'diff') {
-          chars += part.diff.hunks.reduce((sum, hunk) => sum + hunk.lines.length, 0) * 32;
+          chars += (part.diff.hunks ?? []).reduce((sum, hunk) => sum + hunk.lines.length, 0) * 32;
         }
       }
     }
@@ -176,6 +176,7 @@ export function ChatView() {
               state: 'pending',
               callId: event.callId,
               edits: event.edits,
+              queued: event.queued,
             }),
           );
           break;
@@ -261,6 +262,31 @@ export function ChatView() {
     const timer = setTimeout(() => setUndo(null), 4200);
     return () => clearTimeout(timer);
   }, [undo]);
+
+  /**
+   * 切到别的任务时，把旧回合留在界面上的「正在生成」收尾，
+   * 否则那个任务会永远显示执行中，审批条也再没人点得到。
+   */
+  const previousTaskId = useRef<string | null>(null);
+  useEffect(() => {
+    const currentId = task?.id ?? null;
+    if (previousTaskId.current && previousTaskId.current !== currentId) {
+      const orphaned = state.tasks.find((item) => item.id === previousTaskId.current);
+      const streamingMessages = (orphaned?.messages ?? []).filter((message) => message.streaming);
+      for (const message of streamingMessages) {
+        dispatch({
+          type: 'patchMessage',
+          taskId: orphaned!.id,
+          messageId: message.id,
+          patch: (item) => settle(finishThinking(item)),
+        });
+      }
+      setStreaming(false);
+      setApproval(null);
+    }
+    previousTaskId.current = currentId;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task?.id]);
 
   // 空闲时让版画显形；进入对话后退为氛围
   const hasMessages = messages.length > 0;

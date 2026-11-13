@@ -47,5 +47,12 @@ electron scripts/capture-v2.cjs           # 带对话态的整套截图，需要
 ## 验证
 
 - `npm run typecheck`：前端 + 主进程严格检查通过。
-- `npm run build:web`：496 个模块，CSS 66.0 kB（gzip 12.4 kB）。
+- `npm run build:web`：496 个模块，CSS 72.8 kB（gzip 13.4 kB）。
 - 四套皮肤在 1480×940 下逐页截图核对，见 `docs/screenshots-v3/`。
+
+## 两个渲染层的坑（已修，别再踩）
+
+1. **Tailwind 会 purge 掉「拼出来的类名」**：`Markdown` 原来用 ``className={`md-h md-h${level}`}``，
+   `md-h1/2/3` 从不出现在产物 CSS 里，标题字号静默失效。现在改用 `data-level` 属性选择器。
+2. **纯 CSS 里 `@apply` 任意值不可靠**：只在 `@apply` 里引用的 `text-[16px]` 之类不会保证生成，
+   整条规则可能只剩一半声明。Markdown 区块改为原生 CSS + `theme()` / `var()`，不再依赖任意值工具类。

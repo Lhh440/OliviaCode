@@ -42,6 +42,75 @@
   min-height: 0;
 }
 
+/* 已绑定仓库时的页头（与 Chat 页头同形，但用 Git 页自己的字号） */
+.chat-head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 24px 12px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  backdrop-filter: blur(14px);
+}
+
+.chat-head-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.chat-head-left h1 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-head-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.chip.select {
+  height: 28px;
+  padding: 0 26px 0 9px;
+  appearance: none;
+  cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-3) 50%),
+    linear-gradient(135deg, var(--text-3) 50%, transparent 50%);
+  background-position: calc(100% - 14px) 12px, calc(100% - 9px) 12px;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+/* 页内提示条（拉取/推送结果、冲突清单） */
+.run-strip {
+  max-width: 860px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 12px;
+  border: 1px solid var(--amber-line);
+  border-radius: 10px;
+  background: var(--amber-soft);
+  color: var(--text);
+  font-size: 12.4px;
+}
+
+.run-strip .link-btn {
+  margin-left: auto;
+}
+
 /* 页头（原先来自 shell.css，这里按新配色补上） */
 .git-page > .page-head {
   width: 100%;

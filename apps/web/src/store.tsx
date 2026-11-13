@@ -140,8 +140,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     void (async () => {
       for (const task of state.tasks) {
         if (!task.workspace) continue;
+        if (!alive) return;
         const payload = await api.task.load(task.id).catch(() => null);
-        if (!alive || !payload) return;
+        // 单个任务读不到日志只跳过它，不能连累后面的任务
+        if (!payload) continue;
         const messages = replaySession(payload.events as SessionEvent[]);
         if (messages.length > 0) {
           dispatch({ type: 'hydrateMessages', taskId: task.id, messages });

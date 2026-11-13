@@ -72,11 +72,26 @@ export function Inspector({ node, onPatch, onDelete, onInsert }: Props) {
               </select>
             </Field>
             <Field label="时区">
-              <select className="input" defaultValue="Asia/Shanghai">
+              <select
+                className="input"
+                value={node.timezone ?? 'Asia/Shanghai'}
+                onChange={(event) => onPatch({ timezone: event.target.value })}
+              >
                 <option>Asia/Shanghai</option>
                 <option>UTC</option>
               </select>
             </Field>
+            <Field label="启用">
+              <select
+                className="input"
+                value={node.enabled === false ? 'off' : 'on'}
+                onChange={(event) => onPatch({ enabled: event.target.value === 'on' })}
+              >
+                <option value="on">启用</option>
+                <option value="off">暂停</option>
+              </select>
+            </Field>
+            <p className="field-hint">定时调度在 M5 接入：现在「运行工作流」只是手动触发，这里的计划尚不会自动唤醒。</p>
           </>
         )}
 
@@ -168,40 +183,56 @@ export function Inspector({ node, onPatch, onDelete, onInsert }: Props) {
 
         {node.kind === 'gate' && (
           <>
-            <Field label="审批人">
-              <input className="input" defaultValue="我" />
-            </Field>
-            <Field label="超时（分钟）">
+            <Field label="审批超时（分钟）">
               <input
                 className="input"
                 type="number"
                 min={1}
-                value={node.timeout ?? 30}
-                onChange={(event) => onPatch({ timeout: Number(event.target.value) })}
+                max={120}
+                value={node.gateTimeout ?? 30}
+                onChange={(event) => onPatch({ gateTimeout: Number(event.target.value) })}
               />
             </Field>
             <Field label="阻断条件">
               <textarea
                 className="input textarea"
                 rows={4}
-                defaultValue="评审有未解决的高危问题，或测试未全部通过时，不允许合并。"
+                value={
+                  node.blockReason ??
+                  '评审有未解决的高危问题，或测试未全部通过时，不允许合并。'
+                }
+                onChange={(event) => onPatch({ blockReason: event.target.value })}
               />
             </Field>
+            <p className="field-hint">超时按「未通过」处理，运行会失败并把集成分支现状留给你。</p>
           </>
         )}
 
         {node.kind === 'output' && (
           <>
             <Field label="产出">
-              <select className="input" defaultValue="PR + 日报">
-                <option>PR + 日报</option>
-                <option>仅 PR</option>
-                <option>仅日报</option>
+              <select
+                className="input"
+                value={node.outputKind ?? 'both'}
+                onChange={(event) =>
+                  onPatch({ outputKind: event.target.value as 'pr' | 'report' | 'both' })
+                }
+              >
+                <option value="both">PR + 日报</option>
+                <option value="pr">仅 PR</option>
+                <option value="report">仅日报</option>
               </select>
             </Field>
             <Field label="目标分支">
-              <input className="input" defaultValue="main" />
+              <input
+                className="input"
+                value={node.targetBranch ?? 'main'}
+                onChange={(event) => onPatch({ targetBranch: event.target.value })}
+              />
             </Field>
+            <p className="field-hint">
+              产出节点目前只统计结果分支（文件数 / 提交数）；推送与开 PR 仍走 Git 页或对话里的工具。
+            </p>
           </>
         )}
 

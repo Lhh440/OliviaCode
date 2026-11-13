@@ -76,7 +76,7 @@ export function Composer(props: ComposerProps) {
   const canSend = Boolean(value.trim()) && !streaming;
 
   return (
-    <div className="group relative rounded-2xl border border-light-line dark:border-dark-line bg-light-panelStrong dark:bg-dark-panelStrong backdrop-blur-2xl shadow-[0_16px_44px_-22px_rgba(26,31,58,0.4)] transition-all duration-300 focus-within:border-light-accent/45 dark:focus-within:border-dark-accent/45 focus-within:shadow-[0_20px_54px_-22px_rgba(26,31,58,0.5)]">
+    <div className="composer group relative rounded-2xl border border-light-line dark:border-dark-line bg-light-panelStrong dark:bg-dark-panelStrong backdrop-blur-2xl shadow-[0_16px_44px_-22px_rgba(26,31,58,0.4)] transition-all duration-300 focus-within:border-light-accent/45 dark:focus-within:border-dark-accent/45 focus-within:shadow-[0_20px_54px_-22px_rgba(26,31,58,0.5)]">
       {/* 古典装饰顶线 */}
       <div className="absolute inset-x-5 top-0 h-px rule-ornate opacity-60 pointer-events-none" />
 

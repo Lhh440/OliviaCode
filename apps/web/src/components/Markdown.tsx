@@ -19,6 +19,15 @@ type InlineToken =
 const INLINE_RE =
   /(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(__[^_\n]+__)|(\*[^*\n]+\*)|(_[^_\n]+_)|(~~[^~\n]+~~)|(\[[^\]\n]+\]\([^)\s]+\))/g;
 
+/** 只放行安全协议：模型输出（或它读到的仓库内容）里的 javascript: 链接不能可点。 */
+function safeHref(raw: string): string | null {
+  const href = raw.trim();
+  if (!href) return null;
+  if (/^(https?:|mailto:)/i.test(href)) return href;
+  // 站内相对链接不在这里处理，一律降级为纯文本，避免 file:// 或 javascript:
+  return null;
+}
+
 function parseInline(text: string): InlineToken[] {
   const tokens: InlineToken[] = [];
   let last = 0;
@@ -34,11 +43,13 @@ function parseInline(text: string): InlineToken[] {
       tokens.push({ kind: 'strike', text: raw.slice(2, -2) });
     } else if (raw.startsWith('[')) {
       const close = raw.indexOf('](');
-      tokens.push({
-        kind: 'link',
-        text: raw.slice(1, close),
-        href: raw.slice(close + 2, -1),
-      });
+      const href = close >= 0 ? safeHref(raw.slice(close + 2, -1)) : null;
+      if (href && close > 1) {
+        tokens.push({ kind: 'link', text: raw.slice(1, close), href });
+      } else {
+        // 不安全或不完整的链接：原样当文本，不给它变成 <a> 的机会
+        tokens.push({ kind: 'text', text: raw });
+      }
     } else {
       tokens.push({ kind: 'italic', text: raw.slice(1, -1) });
     }
@@ -204,7 +215,7 @@ function CodeBlock({ lang, code }: { lang: string; code: string }) {
 export function Markdown({ text }: { text: string }) {
   const blocks = useMemo(() => parseBlocks(text), [text]);
   return (
-    <div className="md">
+    <div className="md prose-olivia">
       {blocks.map((block, index) => {
         switch (block.kind) {
           case 'code':
@@ -213,7 +224,7 @@ export function Markdown({ text }: { text: string }) {
             const level = Math.min(3, block.level);
             const Tag = (`h${level + 2}` as unknown) as 'h3';
             return (
-              <Tag className={`md-h md-h${level}`} key={index}>
+              <Tag className="md-h" data-level={level} key={index}>
                 {inline(block.text)}
               </Tag>
             );

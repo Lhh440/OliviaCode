@@ -45,6 +45,8 @@ export function useThemeState(): [Skin, (id: string) => void] {
     root.style.setProperty('--olivia-accent', skin.accent);
     root.style.setProperty('--olivia-accent-strong', skin.accentStrong);
     root.style.setProperty('--olivia-gold', skin.gold);
+    // 原生控件（select / 滚动条 / 菜单）跟着皮肤明暗走
+    window.olivia?.theme?.set(skin.mode);
     localStorage.setItem(STORAGE_KEY, skin.id);
     localStorage.removeItem(LEGACY_KEY);
   }, [skin]);

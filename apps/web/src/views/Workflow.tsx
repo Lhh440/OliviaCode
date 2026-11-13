@@ -29,7 +29,7 @@ const KIND_TEXT: Record<NodeKind, { title: string; subtitle: string }> = {
   output: { title: '产出', subtitle: 'Output · 提 PR' },
 };
 
-function loadWorkflow(): Workflow {
+export function loadWorkflow(): Workflow {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
@@ -439,6 +439,8 @@ export function WorkflowView() {
 
   return (
     <div className="workflow-page">
+      <Library onAdd={addNode} />
+
       <div className="wf-main">
         <Canvas
           ref={canvasRef}
@@ -450,8 +452,6 @@ export function WorkflowView() {
           onDropNode={addNodeAt}
           onViewport={setZoom}
         />
-
-        <Library onAdd={addNode} />
 
         <div className="wf-badges">
           <span className="wf-badge">

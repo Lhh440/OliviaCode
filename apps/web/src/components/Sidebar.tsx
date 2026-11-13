@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { relativeTime } from '@olivia/core';
 import { Icon, Mark } from '../icons';
@@ -5,6 +6,7 @@ import { navigate, type Route } from '../router';
 import { createTask, useStore } from '../store';
 import { useTheme } from '../hooks/useTheme';
 import { ThemePicker } from './theme/ThemePicker';
+import { loadWorkflow } from '../views/Workflow';
 
 const STATUS_TITLE: Record<string, string> = {
   idle: '未开始',
@@ -38,6 +40,8 @@ export function Sidebar({ route }: { route: Route }) {
   const activeTask = tasks.find((task) => task.id === activeId);
   const workspace = activeTask?.workspace;
   const workspaceName = workspace ? workspace.split(/[\\/]/).filter(Boolean).pop() : '本地工作区';
+  // 侧栏的节点数与工作流页共用同一份草稿，不写死；只读一次，避免每次渲染都重新生成种子节点
+  const workflowNodes = useMemo(() => loadWorkflow().nodes.length, []);
 
   const onNewTask = () => {
     const task = createTask(settings);
@@ -139,7 +143,9 @@ export function Sidebar({ route }: { route: Route }) {
                 </span>
               )}
               {item.id === 'workflow' && (
-                <span className="relative text-[10.5px] tabular-nums text-light-inkFaint dark:text-dark-inkFaint">1</span>
+                <span className="relative text-[10.5px] tabular-nums text-light-inkFaint dark:text-dark-inkFaint">
+                  {workflowNodes}
+                </span>
               )}
             </button>
           );

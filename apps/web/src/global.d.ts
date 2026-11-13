@@ -22,6 +22,9 @@ declare global {
       platform: string;
       desktop: boolean;
       env: { baseUrl: string; apiKey: string; model: string; workspace: string };
+      theme: {
+        set: (mode: 'light' | 'dark') => void;
+      };
       workspace: {
         pick: () => Promise<string | null>;
         check: (dir: string) => Promise<WorkspaceCheck>;

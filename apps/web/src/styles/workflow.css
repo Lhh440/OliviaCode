@@ -235,21 +235,17 @@
   margin: 0;
 }
 
-/* —— 节点库 —— */
+/* —— 节点库（左侧固定轨，不再浮在画布上挡节点）—— */
 .wf-library {
-  position: absolute;
-  top: 14px;
-  left: 14px;
-  z-index: 5;
-  width: 136px;
-  padding: 8px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
+  flex-shrink: 0;
+  width: 150px;
+  padding: 10px 8px;
+  border-right: 1px solid var(--line);
   background: var(--surface);
-  box-shadow: var(--shadow-md);
   display: flex;
   flex-direction: column;
   gap: 1px;
+  overflow-y: auto;
 }
 
 .wf-lib-title {
@@ -582,6 +578,13 @@
   border-color: var(--accent-line);
   background: var(--accent-soft);
   color: var(--accent);
+}
+
+.field-hint {
+  margin: -4px 0 0;
+  font-size: 10.8px;
+  line-height: 1.5;
+  color: var(--text-3);
 }
 
 .isolation {

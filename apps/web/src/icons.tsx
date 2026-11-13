@@ -73,6 +73,7 @@ const PATHS: Record<string, ReactNode> = {
   output: <path d="M14 4.5h5.5V10M19.5 4.5L10 14M9 5.5H5v13.5h13.5V15" />,
   check: <path d="M5 12.5l4.5 4.5L19 7" />,
   x: <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />,
+  close: <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />,
   trash: <path d="M4.5 7h15M9.5 7V5h5v2M6.5 7l1 13h9l1-13" />,
   zoomIn: (
     <>

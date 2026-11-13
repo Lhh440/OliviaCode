@@ -124,9 +124,10 @@ const DIFF_STATE_LABEL: Record<DiffFile['state'], string> = {
 };
 
 function HunkLines({ diff }: { diff: DiffFile }) {
+  const hunks = diff.hunks ?? [];
   return (
     <div className="divide-y divide-light-line/60 dark:divide-dark-line/60">
-      {diff.hunks.map((hunk, index) => (
+      {hunks.map((hunk, index) => (
         <div key={`${hunk.header}-${index}`}>
           <div className="px-3 py-1 text-[10.5px] font-mono text-light-inkFaint dark:text-dark-inkFaint bg-black/[0.03] dark:bg-white/[0.03]">
             {hunk.header}
@@ -172,8 +173,10 @@ function ProposalCard({
   onDecide: (accepted: number[] | null) => void;
 }) {
   const edits = diff.edits ?? [];
+  const queued = Boolean(diff.queued);
   const [selected, setSelected] = useState<number[]>(() => edits.map((edit) => edit.index));
   const toggle = (index: number): void => {
+    if (queued) return;
     setSelected((current) =>
       current.includes(index) ? current.filter((item) => item !== index) : [...current, index].sort((a, b) => a - b),
     );
@@ -199,7 +202,7 @@ function ProposalCard({
 
       <div className="p-2 space-y-1.5">
         {edits.map((edit) => {
-          const on = selected.includes(edit.index);
+          const on = queued || selected.includes(edit.index);
           return (
             <div
               key={edit.index}
@@ -212,12 +215,13 @@ function ProposalCard({
               <button
                 type="button"
                 onClick={() => toggle(edit.index)}
+                disabled={queued}
                 className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-left hover:bg-black/[0.02] dark:hover:bg-white/[0.03] transition-colors"
               >
                 <span
                   className={`w-3.5 h-3.5 shrink-0 rounded grid place-items-center border transition-colors ${
                     on ? 'bg-amber-500 border-amber-500 text-white' : 'border-light-lineStrong dark:border-dark-lineStrong'
-                  }`}
+                  } ${queued ? 'opacity-70' : ''}`}
                 >
                   {on && <Icon name="check" size={9} />}
                 </span>
@@ -238,16 +242,30 @@ function ProposalCard({
       </div>
 
       <div className="flex items-center gap-2 px-3 py-2 border-t border-light-line/70 dark:border-dark-line bg-black/[0.02] dark:bg-black/20">
-        <span className="flex-1 text-[10.5px] text-light-inkFaint dark:text-dark-inkFaint flex items-center gap-1.5">
-          <Icon name="shield" size={10} />
-          只应用勾选的改动，写入前自动快照
-        </span>
-        <button className="btn-ghost" onClick={() => onDecide(null)}>
-          全部拒绝
-        </button>
-        <button className="btn-solid" disabled={selected.length === 0} onClick={() => onDecide(selected)}>
-          应用选中（{selected.length}）
-        </button>
+        {queued ? (
+          <>
+            <span className="flex-1 text-[10.5px] text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+              <Icon name="shield" size={10} />
+              策略已放行：应用全部 {edits.length} 处，仍在写入前快照
+            </span>
+            <span className="text-[10.5px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400">
+              预览
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="flex-1 text-[10.5px] text-light-inkFaint dark:text-dark-inkFaint flex items-center gap-1.5">
+              <Icon name="shield" size={10} />
+              只应用勾选的改动，写入前自动快照
+            </span>
+            <button className="btn-ghost" onClick={() => onDecide(null)}>
+              全部拒绝
+            </button>
+            <button className="btn-solid" disabled={selected.length === 0} onClick={() => onDecide(selected)}>
+              应用选中（{selected.length}）
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -593,7 +611,7 @@ export function UndoToast({ result }: { result: UndoResult }) {
         {result.ok
           ? `已撤销：${result.paths.join('、') || '文件已恢复'}${
               typeof result.remaining === 'number' ? ` · 还能回退 ${result.remaining} 步` : ''
-            }`
+            }${result.skipped?.length ? ` · ${result.skipped.length} 个文件未存快照，已跳过` : ''}`
           : result.message}
       </span>
     </motion.div>
