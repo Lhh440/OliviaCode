@@ -2,11 +2,15 @@
 
 本地优先的 AI 编程工作站。外观与交互贴近 Codex，但多了几件它不给的事：**可视化工作流、逐处接受的改动、多步回滚、Git 直连**。
 
-当前是 **M3：Git 与改动的完整闭环**——模型能读你的仓库、改文件、跑命令、提交、推送、开 PR，每一步都可见、可拒、可回滚。
+当前是 **M3：Git 与改动的完整闭环**——模型能读你的仓库、改文件、跑命令、提交、推送、开 PR，每一步都可见、可拒、可回滚。界面已经换成四套完整皮肤（见 [docs/theme.md](docs/theme.md)）。
 
 <p align="center">
-  <img src="docs/screenshots/m2-proposal.png" alt="逐处接受改动" width="49%" />
-  <img src="docs/screenshots/m3-git.png" alt="Git 面板" width="49%" />
+  <img src="docs/screenshots-v3/lily-welcome.png" alt="白百合 · 首屏" width="49%" />
+  <img src="docs/screenshots-v3/madonna-chat.png" alt="荆棘圣母 · 对话" width="49%" />
+</p>
+<p align="center">
+  <img src="docs/screenshots-v3/theme-picker.png" alt="主题面板" width="49%" />
+  <img src="docs/screenshots-v3/madonna-workflow.png" alt="工作流画布" width="49%" />
 </p>
 
 ## 能用的东西
@@ -20,10 +24,18 @@
 - **审批**：写文件与跑命令默认逐次询问；「始终允许」落进工作区 `.olivia/policy.json`，可提交、可审。
 - **主进程隔离**：模型调用、`fs`、命令、令牌都在主进程，渲染层只发意图、收事件。
 - **事件日志**：每个任务一份 JSONL，重启后重放消息、工具记录与 diff。
+- **四套皮肤**：钴蓝天使、朱红拼贴、白百合、荆棘圣母，亮暗成对，侧栏一键整组互换；底图、纹样、强调色都跟着换，选择记在本机。
 
 <p align="center">
-  <img src="docs/screenshots/m2-read.png" alt="读路径" width="49%" />
-  <img src="docs/screenshots/m2-undo.png" alt="回滚" width="49%" />
+  <img src="docs/screenshots-v3/angel-welcome.png" alt="钴蓝天使" width="24%" />
+  <img src="docs/screenshots-v3/madonna-welcome.png" alt="荆棘圣母" width="24%" />
+  <img src="docs/screenshots-v3/lily-settings.png" alt="白百合 · 设置" width="24%" />
+  <img src="docs/screenshots-v3/madonna-settings.png" alt="荆棘圣母 · 设置" width="24%" />
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/m2-proposal.png" alt="逐处接受改动" width="49%" />
+  <img src="docs/screenshots/m3-git.png" alt="Git 面板" width="49%" />
 </p>
 
 ## 快速开始
@@ -40,6 +52,8 @@ npm run dev:web        # 只跑前端，浏览器访问 http://127.0.0.1:5273
 npm run typecheck      # 前端 + 主进程严格检查
 npm run shot           # 截图到 docs/screenshots
 ```
+
+外观相关的细节（皮肤定义、布局、截图脚本踩过的坑）见 [docs/theme.md](docs/theme.md)。
 
 ## 接自己的模型
 
@@ -112,6 +126,7 @@ packages/
 | M1 | 主进程 agent 循环、8 个工具、审批、快照撤销、事件日志 | ✅ |
 | M2 | 逐处接受、多步回滚（并入 M3） | ✅ |
 | M3 | Git 面板、令牌保险箱、提交/拉推/PR、GitHub + GitCode | ✅ 本次 |
+| M3.5 | 四套皮肤、词典式侧栏、一体化输入框、设置页 Tailwind 化 | ✅ |
 | M4 | 多智能体并行与工作流真实执行 | 下一步 |
 | M5 | 定时任务（无人值守，出报告或提 PR） | 计划 |
 | M6 | MCP 接入与团队技能 | 计划 |

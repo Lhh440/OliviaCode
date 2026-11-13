@@ -19,7 +19,7 @@
   align-items: center;
   gap: 8px;
   padding: 6px 12px;
-  background: #fafafc;
+  background: var(--bg-elev);
   font-size: 11.5px;
   color: var(--text-2);
 }
@@ -31,7 +31,7 @@
 
 .proposal-edit .diff-body {
   max-height: 200px;
-  background: #fcfcfd;
+  background: var(--surface);
 }
 
 /* —— Git 页 —— */
@@ -40,6 +40,27 @@
   flex-direction: column;
   height: 100%;
   min-height: 0;
+}
+
+/* 页头（原先来自 shell.css，这里按新配色补上） */
+.git-page > .page-head {
+  width: 100%;
+  max-width: 908px;
+  margin: 0 auto;
+  padding: 20px 24px 14px;
+}
+
+.page-head h1 {
+  margin: 0 0 4px;
+  font-size: 21px;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.page-head p {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-3);
 }
 
 .git-scroll {
@@ -84,7 +105,7 @@
   border: 1px solid var(--line);
   border-radius: 10px;
   overflow: hidden;
-  background: #fff;
+  background: var(--surface);
 }
 
 .git-file-row {
@@ -98,7 +119,7 @@
 }
 
 .git-file-row:hover {
-  background: #fafafc;
+  background: var(--bg-elev);
 }
 
 .git-flag {
@@ -108,7 +129,7 @@
   width: 18px;
   height: 18px;
   border-radius: 5px;
-  background: #f1f1f4;
+  background: var(--surface-2);
   font-family: var(--font-mono);
   font-size: 10.5px;
   color: var(--text-2);
@@ -147,7 +168,7 @@
 
 .git-hunks {
   border-top: 1px solid var(--line);
-  background: #fcfcfd;
+  background: var(--surface);
   padding: 6px 0;
 }
 
@@ -162,7 +183,7 @@
   gap: 7px;
   font-family: var(--font-mono);
   font-size: 10.8px;
-  color: #7a7a86;
+  color: var(--text-3);
 }
 
 .git-hunk pre {
@@ -170,7 +191,7 @@
   padding: 4px 8px;
   max-height: 190px;
   overflow: auto;
-  background: #f6f6f9;
+  background: var(--surface-2);
   border-radius: 6px;
   font-family: var(--font-mono);
   font-size: 11.2px;
@@ -224,7 +245,7 @@
   gap: 10px;
   padding: 5px 2px;
   font-size: 12px;
-  border-bottom: 1px solid #f4f4f7;
+  border-bottom: 1px solid var(--line-soft);
 }
 
 .git-log-row:last-child {
@@ -268,7 +289,7 @@
   height: 48px;
   margin: 0 auto 12px;
   border-radius: 14px;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   box-shadow: var(--shadow-sm);
   display: flex;
@@ -300,7 +321,7 @@
   flex-direction: column;
   gap: 6px;
   padding: 10px 0;
-  border-top: 1px solid #f3f3f6;
+  border-top: 1px solid var(--line-soft);
 }
 
 .vault-row:first-of-type {
@@ -319,7 +340,7 @@
 .vault-state {
   padding: 1px 7px;
   border-radius: 999px;
-  background: #f2f2f5;
+  background: var(--surface-2);
   color: var(--text-3);
   font-size: 10.5px;
   font-weight: 400;

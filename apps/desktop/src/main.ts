@@ -69,7 +69,7 @@ function createWindow(): void {
     height: 940,
     minWidth: 1120,
     minHeight: 720,
-    backgroundColor: '#fbfbfc',
+    backgroundColor: '#f2efe8',
     autoHideMenuBar: true,
     title: 'OliviaCode',
     show: false,
