@@ -1,12 +1,16 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, Notification, shell } from 'electron';
 import path from 'node:path';
 import type {
   ApprovalDecision,
   GitProvider,
   PatchDecision,
+  RunRecord,
+  ScheduleRecord,
+  SchedulerEvent,
   TurnEnvelope,
   TurnEvent,
   TurnStartArgs,
+  UnattendedPolicy,
   WorkflowRunArgs,
   WorkflowRunEvent,
 } from '@olivia/core';
@@ -31,6 +35,9 @@ import {
   unstagePaths,
 } from './git';
 import { createPullRequest } from './providers';
+import { Scheduler } from './scheduler';
+import { SchedulerStore } from './scheduler-store';
+import type { SyncInput } from './schedule-sync';
 import { SessionStore } from './sessions';
 import { checkWorkspace } from './workspace';
 import * as vault from './vault';
@@ -43,6 +50,9 @@ const devUrl = process.env.OLIVIA_DEV_URL || 'http://127.0.0.1:5273';
 let mainWindow: BrowserWindow | null = null;
 let sessions: SessionStore;
 let snapshots: SnapshotStore;
+let scheduler: Scheduler | null = null;
+
+const reportsDir = (): string => path.join(app.getPath('userData'), 'reports');
 
 interface TurnContext {
   abort: AbortController;
@@ -394,6 +404,80 @@ ipcMain.handle('olivia:vault.clear', async (_event, provider: GitProvider) => {
   return { ok: true };
 });
 
+// —— 无人值守模型凭据（Key 只写不读）——
+ipcMain.handle('olivia:vault.model-status', async () => vault.modelStatus());
+ipcMain.handle(
+  'olivia:vault.model-set',
+  async (_event, args: { baseUrl: string; apiKey: string; model: string }) => {
+    try {
+      vault.setModelCredential(args);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, message: error instanceof Error ? error.message : String(error) };
+    }
+  },
+);
+ipcMain.handle('olivia:vault.model-clear', async () => {
+  vault.clearModelCredential();
+  return { ok: true };
+});
+
+// —— 定时任务（M5）——
+ipcMain.handle('olivia:schedules.list', async (): Promise<ScheduleRecord[]> =>
+  scheduler ? await scheduler.list() : [],
+);
+ipcMain.handle('olivia:schedules.runs', async (_event, scheduleId: string): Promise<RunRecord[]> =>
+  scheduler ? await scheduler.listRuns(scheduleId) : [],
+);
+ipcMain.handle('olivia:schedules.recent', async (): Promise<RunRecord[]> =>
+  scheduler ? await scheduler.recentRuns() : [],
+);
+ipcMain.handle('olivia:schedules.preview', async (_event, id: string): Promise<number[]> =>
+  scheduler ? await scheduler.preview(id) : [],
+);
+ipcMain.handle('olivia:schedules.sync', async (_event, input: SyncInput) => {
+  if (!scheduler) return { ok: false, error: '调度器还没启动' };
+  const result = await scheduler.syncWorkflow(input);
+  return { ok: true, ...result };
+});
+ipcMain.handle(
+  'olivia:schedules.update',
+  async (
+    _event,
+    args: { id: string; patch: Partial<Pick<ScheduleRecord, 'enabled' | 'mode' | 'policy'>> },
+  ) => {
+    if (!scheduler) return { ok: false, error: '调度器还没启动' };
+    try {
+      const schedule = await scheduler.update(args.id, args.patch as {
+        enabled?: boolean;
+        mode?: ScheduleRecord['mode'];
+        policy?: UnattendedPolicy;
+      });
+      return schedule ? { ok: true, schedule } : { ok: false, error: '计划不存在' };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  },
+);
+ipcMain.handle('olivia:schedules.run-now', async (_event, id: string) => {
+  if (!scheduler) return { ok: false, error: '调度器还没启动' };
+  return await scheduler.runNow(id);
+});
+ipcMain.on('olivia:schedules.cancel', (_event, id: string) => {
+  scheduler?.cancel(id);
+});
+ipcMain.handle('olivia:schedules.open-report', async (_event, filePath: string) => {
+  // 只允许打开报告目录内的文件，避免这条通道变成任意文件打开器
+  const root = path.resolve(reportsDir());
+  const target = path.resolve(filePath);
+  const rel = path.relative(root, target);
+  if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) {
+    return { ok: false, error: '报告路径不在报告目录内' };
+  }
+  const error = await shell.openPath(target);
+  return error ? { ok: false, error } : { ok: true };
+});
+
 // —— Git ——
 ipcMain.handle('olivia:git.pick-dir', async () => {
   const result = await dialog.showOpenDialog({
@@ -547,10 +631,55 @@ app.whenReady().then(() => {
   sessions = new SessionStore(path.join(app.getPath('userData'), 'sessions'));
   snapshots = new SnapshotStore(path.join(app.getPath('userData'), 'snapshots'));
   nativeTheme.themeSource = 'light';
+
+  /**
+   * M5 调度器：常驻主进程，关掉窗口也照跑。
+   * 凭据解析顺序：保险箱里存的（无人值守需要）→ 环境变量；都没有则预检失败。
+   */
+  const env = readEnv();
+  scheduler = new Scheduler({
+    store: new SchedulerStore(app.getPath('userData')),
+    snapshots,
+    worktreeRoot: path.join(app.getPath('userData'), 'worktrees'),
+    reportsDir: reportsDir(),
+    resolveCredentials: () => {
+      const saved = vault.modelCredential();
+      if (saved) return saved;
+      if (env.apiKey) {
+        return {
+          baseUrl: env.baseUrl || 'https://api.deepseek.com/v1',
+          apiKey: env.apiKey,
+          model: env.model || 'deepseek-v4.1-flash',
+        };
+      }
+      return null;
+    },
+    gitToken: (provider) => vault.token(provider),
+    emit: (event: SchedulerEvent) => {
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (!win.isDestroyed()) win.webContents.send('olivia:schedules.event', event);
+      }
+    },
+    notify: (title, body) => {
+      try {
+        if (Notification.isSupported()) new Notification({ title, body }).show();
+      } catch {
+        // 通知失败不影响调度
+      }
+    },
+  });
+  void scheduler.start().catch((error) => {
+    console.error('调度器启动失败：', error);
+  });
+
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+});
+
+app.on('before-quit', () => {
+  scheduler?.stop();
 });
 
 app.on('window-all-closed', () => {

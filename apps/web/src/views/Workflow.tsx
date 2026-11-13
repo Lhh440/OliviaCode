@@ -79,9 +79,13 @@ export function WorkflowView() {
       } catch {
         // 存储失败不影响编辑
       }
+      // 画布变更同步给主进程调度器：触发器就是计划，别让两边各说各话
+      void window.olivia?.schedules
+        ?.sync({ workflow: wf, workspace })
+        .catch(() => undefined);
     }, 280);
     return () => clearTimeout(timer);
-  }, [wf]);
+  }, [wf, workspace]);
 
   const applyRunEvent = useCallback((event: WorkflowRunEvent) => {
     if (event.type === 'run.start') {

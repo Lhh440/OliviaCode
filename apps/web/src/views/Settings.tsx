@@ -63,10 +63,43 @@ export function SettingsView() {
   const [vault, setVault] = useState<VaultStatus>({ gitcode: false, github: false });
   const [tokens, setTokens] = useState<Record<GitProvider, string>>({ gitcode: '', github: '' });
   const [vaultNotice, setVaultNotice] = useState<string | null>(null);
+  const [modelStatus, setModelStatus] = useState<{ saved: boolean; baseUrl: string; model: string }>({
+    saved: false,
+    baseUrl: '',
+    model: '',
+  });
+  const [modelDraft, setModelDraft] = useState({
+    baseUrl: '',
+    apiKey: '',
+    model: 'deepseek-v4.1-flash',
+  });
+  const [modelNotice, setModelNotice] = useState<string | null>(null);
 
   useEffect(() => {
     void window.olivia?.vault.status().then(setVault);
+    void window.olivia?.vault.modelStatus().then((status) => setModelStatus(status));
   }, []);
+
+  const saveModel = async (): Promise<void> => {
+    const api = window.olivia;
+    if (!api) return;
+    const result = await api.vault.setModel({
+      baseUrl: modelDraft.baseUrl || modelStatus.baseUrl,
+      apiKey: modelDraft.apiKey,
+      model: modelDraft.model,
+    });
+    setModelNotice(result.ok ? '已加密保存，无人值守运行会用它' : result.message ?? '保存失败');
+    if (result.ok) {
+      setModelDraft((current) => ({ ...current, apiKey: '' }));
+      setModelStatus(await api.vault.modelStatus());
+    }
+  };
+
+  const clearModel = async (): Promise<void> => {
+    await window.olivia?.vault.clearModel();
+    setModelStatus(await window.olivia!.vault.modelStatus());
+    setModelNotice('已清除；无人值守运行会回退到环境变量，没有则预检失败');
+  };
 
   const saveToken = async (provider: GitProvider): Promise<void> => {
     const api = window.olivia;
@@ -249,6 +282,81 @@ export function SettingsView() {
             </p>
           </Section>
 
+          {/* 无人值守凭据 */}
+          <Section
+            icon="clock"
+            title="无人值守凭据"
+            desc="定时任务在没人看着时也要能调模型，所以这份 Key 需要加密存在本机；界面同样只写不读。"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-[12.5px] font-medium text-light-ink dark:text-dark-ink">模型接入</span>
+              <span
+                className={`text-[10px] px-1.5 py-0.5 rounded ${
+                  modelStatus.saved
+                    ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                    : 'bg-amber-500/10 text-amber-700 dark:text-amber-300'
+                }`}
+              >
+                {modelStatus.saved ? `已保存 · ${modelStatus.model}` : '未保存 · 回退环境变量'}
+              </span>
+            </div>
+            <Field label="Base URL" note={modelStatus.saved ? `当前：${modelStatus.baseUrl}` : undefined}>
+              <input
+                className="field-input font-mono text-[12px]"
+                value={modelDraft.baseUrl}
+                spellCheck={false}
+                placeholder={modelStatus.baseUrl || 'https://api.deepseek.com/v1'}
+                onChange={(event) =>
+                  setModelDraft((current) => ({ ...current, baseUrl: event.target.value }))
+                }
+              />
+            </Field>
+            <Field label="API Key" note="只写不读；不填表示保留已存的那份。">
+              <input
+                className="field-input font-mono text-[12px]"
+                type="password"
+                value={modelDraft.apiKey}
+                spellCheck={false}
+                placeholder="sk-…"
+                onChange={(event) =>
+                  setModelDraft((current) => ({ ...current, apiKey: event.target.value }))
+                }
+              />
+            </Field>
+            <Field label="模型">
+              <select
+                className="field-select"
+                value={modelDraft.model}
+                onChange={(event) =>
+                  setModelDraft((current) => ({ ...current, model: event.target.value }))
+                }
+              >
+                {MODELS.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <div className="flex items-center gap-1.5">
+              <button className="btn-solid" disabled={!modelDraft.apiKey.trim()} onClick={() => void saveModel()}>
+                保存
+              </button>
+              <button className="btn-ghost" disabled={!modelStatus.saved} onClick={() => void clearModel()}>
+                清除
+              </button>
+              {modelNotice && (
+                <span className="text-[11px] text-light-inkFaint dark:text-dark-inkFaint">{modelNotice}</span>
+              )}
+            </div>
+            <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-light-inkFaint dark:text-dark-inkFaint">
+              <Icon name="shield" size={11} className="mt-[3px] shrink-0" />
+              <span>
+                定时任务会按「计划」页的预算与审批门策略执行；这份凭据只给主进程的调度器用，渲染层拿不到明文。
+              </span>
+            </p>
+          </Section>
+
           {/* Git 凭据 */}
           <Section
             icon="key"
@@ -312,7 +420,7 @@ export function SettingsView() {
           <Section icon="layers" title="关于" desc="本地优先的 AI 编程工作站。">
             <div className="divide-y divide-light-line dark:divide-dark-line">
               {[
-                { label: '版本', value: '0.5.0 · M2+M3+M4' },
+                { label: '版本', value: '0.6.0 · M2+M3+M4+M5' },
                 {
                   label: '运行形态',
                   value: typeof window !== 'undefined' && 'olivia' in window ? 'Electron 桌面端' : '浏览器预览',

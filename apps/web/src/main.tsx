@@ -5,6 +5,7 @@ import './styles/themes/base.css';
 import './styles/themes/legacy.css';
 import './styles/workflow.css';
 import './styles/git.css';
+import './styles/schedules.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('缺少 #root 挂载点');

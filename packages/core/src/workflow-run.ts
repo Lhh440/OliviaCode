@@ -18,6 +18,8 @@ export type RunLogKind = 'info' | 'text' | 'tool' | 'error';
 
 export interface NodeRunState {
   nodeId: string;
+  /** 节点标题的快照：运行结束后画布可能已经改了，报告仍要能显示当时的名字 */
+  title?: string;
   phase: RunPhase;
   attempts: number;
   startedAt?: number;

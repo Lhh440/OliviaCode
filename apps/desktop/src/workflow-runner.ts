@@ -38,6 +38,14 @@ export interface WorkflowRuntimeOptions {
   emit: (event: WorkflowRunEvent) => void;
   requestGate: (node: WfNode, detail: string) => Promise<boolean>;
   signal: AbortSignal;
+  /** 无人值守预算：墙钟上限（分钟）与整轮模型步数上限 */
+  budget?: { maxWallMinutes: number; maxSteps: number };
+  /** 无人值守时的审批门策略；不传 = 交互式（等人） */
+  gatePolicy?: 'pause-and-notify' | 'auto-approve' | 'auto-reject';
+  /** 每执行一个工具调用回调一次：外部据此扣预算 */
+  onStep?: (node: WfNode, tool: string, args: unknown) => void;
+  /** 额外日志出口（无人值守时没有渲染层在听，需要落盘/通知） */
+  onLog?: (line: { at: number; nodeId?: string; kind: WorkflowRunState['logs'][number]['kind']; text: string }) => void;
 }
 
 const KIND_LABEL: Record<WfNode['kind'], string> = {
@@ -195,8 +203,22 @@ class Semaphore {
 }
 
 export async function runWorkflow(options: WorkflowRuntimeOptions): Promise<WorkflowRunState> {
-  const { runId, workflow, workspace, emit, signal } = options;
+  const { runId, workflow, workspace, emit, signal: externalSignal } = options;
   const startedAt = Date.now();
+  const nodeById = new Map(workflow.nodes.map((node) => [node.id, node]));
+
+  /** 整轮取消信号的汇合点：人工取消 + 预算打断都从这里出去。 */
+  const runAbort = new AbortController();
+  if (externalSignal.aborted) runAbort.abort();
+  else externalSignal.addEventListener('abort', () => runAbort.abort(), { once: true });
+  const runSignal = runAbort.signal;
+  // 函数内部一律用合并后的信号，原先读 options.signal 的地方不改也能吃到预算中断
+  const signal = runSignal;
+
+  // 无人值守预算状态：finish() 会在早期失败路径（环检测等）里读它，所以必须前置声明
+  let budgetHit: string | null = null;
+  let stepsUsed = 0;
+  let wallTimer: NodeJS.Timeout | undefined;
   const state: WorkflowRunState = {
     id: runId,
     workflowId: workflow.id,
@@ -208,18 +230,21 @@ export async function runWorkflow(options: WorkflowRuntimeOptions): Promise<Work
     logs: [],
   };
   for (const node of workflow.nodes) {
-    state.nodes[node.id] = { nodeId: node.id, phase: 'queued', attempts: 0 };
+    state.nodes[node.id] = { nodeId: node.id, title: node.title, phase: 'queued', attempts: 0 };
   }
 
   const log = (text: string, kind: WorkflowRunState['logs'][number]['kind'] = 'info', nodeId?: string): void => {
-    state.logs.push({ at: Date.now(), nodeId, kind, text });
+    const line = { at: Date.now(), nodeId, kind, text };
+    state.logs.push(line);
     if (state.logs.length > 400) state.logs.splice(0, state.logs.length - 400);
     emit({ type: 'node.log', nodeId, kind, text });
+    options.onLog?.({ ...line });
   };
 
   const setPhase = (nodeId: string, phase: RunPhase, patch: Partial<NodeRunState> = {}): void => {
     const current = state.nodes[nodeId] ?? { nodeId, phase, attempts: 0 };
-    const next: NodeRunState = { ...current, ...patch, phase };
+    const title = nodeById.get(nodeId)?.title ?? current.title;
+    const next: NodeRunState = { ...current, ...patch, title, phase };
     if (phase === 'running' && !next.startedAt) next.startedAt = Date.now();
     if ((phase === 'done' || phase === 'failed' || phase === 'skipped' || phase === 'canceled') && !next.endedAt) {
       next.endedAt = Date.now();
@@ -274,7 +299,6 @@ export async function runWorkflow(options: WorkflowRuntimeOptions): Promise<Work
     return finish({ ok: false, error: `创建集成分支失败：${errorText(error)}` });
   }
 
-  const nodeById = new Map(workflow.nodes.map((node) => [node.id, node]));
   const upstream = new Map<string, string[]>();
   for (const node of workflow.nodes) upstream.set(node.id, []);
   for (const edge of workflow.edges) {
@@ -298,6 +322,38 @@ export async function runWorkflow(options: WorkflowRuntimeOptions): Promise<Work
   const dropBranch = async (branch: string): Promise<void> => {
     await git(workspace, ['branch', '-D', branch]).catch(() => undefined);
   };
+
+  /**
+   * 无人值守预算：
+   * - 墙钟：到点直接 abort 整轮（模型流、命令、审批门都会收到取消信号）；
+   * - 步数：由 onStep 扣，扣完再 abort。
+   * 被预算打断不算「用户取消」，finish 时按失败收场并说明是预算。
+   */
+  if (options.budget) {
+    const maxSteps = Math.max(1, options.budget.maxSteps);
+    const maxWallMs = Math.max(1, options.budget.maxWallMinutes) * 60_000;
+    const timer = setTimeout(() => {
+      if (budgetHit) return;
+      budgetHit = `墙钟超过 ${options.budget!.maxWallMinutes} 分钟`;
+      log(`无人值守预算触发：${budgetHit}，终止本次运行`, 'error');
+      runAbort.abort();
+    }, maxWallMs);
+    timer.unref?.();
+    wallTimer = timer;
+    const innerOnStep = options.onStep;
+    options = {
+      ...options,
+      onStep: (node, tool, args) => {
+        stepsUsed += 1;
+        innerOnStep?.(node, tool, args);
+        if (stepsUsed > maxSteps && !budgetHit) {
+          budgetHit = `模型步数超过上限 ${maxSteps}`;
+          log(`无人值守预算触发：${budgetHit}，终止本次运行`, 'error');
+          runAbort.abort();
+        }
+      },
+    };
+  }
 
   const runAgentNode = async (node: WfNode): Promise<RunPhase> => {
     const branch = `olivia/wf-${short}-${node.id}`;
@@ -348,6 +404,7 @@ export async function runWorkflow(options: WorkflowRuntimeOptions): Promise<Work
               }
               if (event.type === 'tool.request') {
                 log(`${event.call.name} · ${event.call.detail}`, 'tool', node.id);
+                options.onStep?.(node, event.call.name, event.call.args);
                 return;
               }
               if (event.type === 'tool.result') {
@@ -439,7 +496,10 @@ export async function runWorkflow(options: WorkflowRuntimeOptions): Promise<Work
         tools: resolveTools({ ...node, tools: node.tools?.length ? node.tools : ['read', 'git'] }),
         emit: (event: TurnEvent): void => {
           if (event.type === 'text') text += event.delta;
-          if (event.type === 'tool.request') log(`${event.call.name} · ${event.call.detail}`, 'tool', node.id);
+          if (event.type === 'tool.request') {
+            log(`${event.call.name} · ${event.call.detail}`, 'tool', node.id);
+            options.onStep?.(node, event.call.name, event.call.args);
+          }
         },
         requestApproval: async () => 'once',
         requestPatch: async () => null,
@@ -478,7 +538,17 @@ export async function runWorkflow(options: WorkflowRuntimeOptions): Promise<Work
       .join('；');
     emit({ type: 'gate.waiting', nodeId: node.id, title: node.title, detail });
     try {
-      const approved = await options.requestGate(node, detail);
+      const gateMode = options.gatePolicy ?? 'pause-and-notify';
+      let approved: boolean;
+      if (gateMode === 'auto-approve') {
+        log(`无人值守：审批门「${node.title}」按策略自动批准`, 'info', node.id);
+        approved = true;
+      } else if (gateMode === 'auto-reject') {
+        log(`无人值守：审批门「${node.title}」按策略自动拒绝`, 'error', node.id);
+        approved = false;
+      } else {
+        approved = await options.requestGate(node, detail);
+      }
       if (!approved) {
         if (signal.aborted) {
           setPhase(node.id, 'canceled', { error: '已取消', endedAt: Date.now() });
@@ -592,7 +662,8 @@ export async function runWorkflow(options: WorkflowRuntimeOptions): Promise<Work
   }
   const failed = workflow.nodes.filter((node) => state.nodes[node.id]?.phase === 'failed');
   if (signal.aborted) {
-    return finish({ ok: false, error: '已取消', canceled: true });
+    // 预算打断时走失败分支（原因由 finish 统一补），其余才是人工取消
+    return finish({ ok: false, error: budgetHit ? `无人值守预算：${budgetHit}` : '已取消', canceled: !budgetHit });
   }
   return finish({
     ok: false,
@@ -602,11 +673,14 @@ export async function runWorkflow(options: WorkflowRuntimeOptions): Promise<Work
   });
 
   function finish(result: { ok: boolean; error?: string; branch?: string; canceled?: boolean }): WorkflowRunState {
-    state.phase = result.ok ? 'done' : result.canceled ? 'canceled' : 'failed';
+    if (wallTimer) clearTimeout(wallTimer);
+    // 预算打断不是「用户取消」：它要算失败，并且把原因写清楚，避免被当成正常收工
+    const budgetFailed = Boolean(budgetHit) && !result.ok;
+    state.phase = result.ok ? 'done' : budgetFailed ? 'failed' : result.canceled ? 'canceled' : 'failed';
     state.endedAt = Date.now();
-    state.error = result.error;
+    state.error = budgetFailed ? `无人值守预算：${budgetHit}` : result.error;
     if (result.branch) state.branch = result.branch;
-    emit({ type: 'run.done', ok: result.ok, branch: state.branch, error: result.error });
+    emit({ type: 'run.done', ok: result.ok, branch: state.branch, error: state.error });
     return state;
   }
 }

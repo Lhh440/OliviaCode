@@ -4,10 +4,14 @@ import type {
   GitPrResult,
   GitProvider,
   GitRepoState,
+  RunRecord,
+  ScheduleRecord,
   TurnEnvelope,
   TurnStartArgs,
   UndoResult,
+  UnattendedPolicy,
   VaultStatus,
+  Workflow,
   WorkflowRunArgs,
   WorkflowRunEvent,
   WorkspaceCheck,
@@ -54,6 +58,34 @@ declare global {
         status: () => Promise<VaultStatus>;
         set: (provider: GitProvider, token: string) => Promise<{ ok: boolean; message?: string }>;
         clear: (provider: GitProvider) => Promise<{ ok: boolean }>;
+        modelStatus: () => Promise<{ saved: boolean; baseUrl: string; model: string }>;
+        setModel: (input: {
+          baseUrl: string;
+          apiKey: string;
+          model: string;
+        }) => Promise<{ ok: boolean; message?: string }>;
+        clearModel: () => Promise<{ ok: boolean }>;
+      };
+      schedules: {
+        list: () => Promise<ScheduleRecord[]>;
+        runs: (scheduleId: string) => Promise<RunRecord[]>;
+        recent: () => Promise<RunRecord[]>;
+        preview: (id: string) => Promise<number[]>;
+        sync: (input: { workflow: Workflow; workspace: string }) => Promise<{
+          ok: boolean;
+          schedules?: ScheduleRecord[];
+          created?: string[];
+          disabled?: string[];
+          error?: string;
+        }>;
+        update: (
+          id: string,
+          patch: { enabled?: boolean; mode?: ScheduleRecord['mode']; policy?: UnattendedPolicy },
+        ) => Promise<{ ok: boolean; schedule?: ScheduleRecord; error?: string }>;
+        runNow: (id: string) => Promise<{ ok: boolean; error?: string; run?: RunRecord }>;
+        cancel: (id: string) => void;
+        openReport: (filePath: string) => Promise<{ ok: boolean; error?: string }>;
+        onEvent: (listener: (event: unknown) => void) => () => void;
       };
       git: {
         pickDir: () => Promise<string | null>;

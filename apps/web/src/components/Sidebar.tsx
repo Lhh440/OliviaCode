@@ -29,6 +29,7 @@ const STATUS_DOT: Record<string, string> = {
 const NAV: { id: Route; icon: string; label: string }[] = [
   { id: 'chat', icon: 'message', label: '任务' },
   { id: 'workflow', icon: 'workflow', label: '工作流' },
+  { id: 'schedules', icon: 'clock', label: '计划' },
   { id: 'git', icon: 'git', label: 'Git' },
   { id: 'settings', icon: 'settings', label: '设置' },
 ];
@@ -74,7 +75,7 @@ export function Sidebar({ route }: { route: Route }) {
               OliviaCode
             </span>
             <span className="block text-[10px] tracking-[0.14em] uppercase text-light-inkFaint dark:text-dark-inkFaint">
-              {skin.name} · 0.5
+              {skin.name} · 0.6
             </span>
           </span>
           <ThemePicker />
@@ -227,7 +228,7 @@ export function Sidebar({ route }: { route: Route }) {
               演示模式
             </span>
           )}
-          <span className="text-light-inkFaint dark:text-dark-inkFaint">M2+M3+M4</span>
+          <span className="text-light-inkFaint dark:text-dark-inkFaint">M2+M3+M4+M5</span>
         </div>
       </div>
     </aside>

@@ -22,7 +22,7 @@ try {
 }
 
 contextBridge.exposeInMainWorld('olivia', {
-  version: '0.5.0',
+  version: '0.6.0',
   platform: process.platform,
   desktop: true,
   env,
@@ -86,6 +86,36 @@ contextBridge.exposeInMainWorld('olivia', {
       ipcRenderer.invoke('olivia:vault.set', { provider, token }),
     clear: (provider: GitProvider): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke('olivia:vault.clear', provider),
+    modelStatus: (): Promise<{ saved: boolean; baseUrl: string; model: string }> =>
+      ipcRenderer.invoke('olivia:vault.model-status'),
+    setModel: (input: {
+      baseUrl: string;
+      apiKey: string;
+      model: string;
+    }): Promise<{ ok: boolean; message?: string }> =>
+      ipcRenderer.invoke('olivia:vault.model-set', input),
+    clearModel: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('olivia:vault.model-clear'),
+  },
+  schedules: {
+    list: (): Promise<unknown[]> => ipcRenderer.invoke('olivia:schedules.list'),
+    runs: (scheduleId: string): Promise<unknown[]> =>
+      ipcRenderer.invoke('olivia:schedules.runs', scheduleId),
+    recent: (): Promise<unknown[]> => ipcRenderer.invoke('olivia:schedules.recent'),
+    preview: (id: string): Promise<number[]> => ipcRenderer.invoke('olivia:schedules.preview', id),
+    sync: (input: unknown): Promise<unknown> => ipcRenderer.invoke('olivia:schedules.sync', input),
+    update: (id: string, patch: unknown): Promise<unknown> =>
+      ipcRenderer.invoke('olivia:schedules.update', { id, patch }),
+    runNow: (id: string): Promise<unknown> => ipcRenderer.invoke('olivia:schedules.run-now', id),
+    cancel: (id: string): void => {
+      ipcRenderer.send('olivia:schedules.cancel', id);
+    },
+    openReport: (filePath: string): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke('olivia:schedules.open-report', filePath),
+    onEvent: (listener: (event: unknown) => void): (() => void) => {
+      const handler = (_event: unknown, payload: unknown): void => listener(payload);
+      ipcRenderer.on('olivia:schedules.event', handler);
+      return () => ipcRenderer.removeListener('olivia:schedules.event', handler);
+    },
   },
   git: {
     pickDir: (): Promise<string | null> => ipcRenderer.invoke('olivia:git.pick-dir'),

@@ -3,6 +3,7 @@ import { useRoute } from './router';
 import { StoreProvider } from './store';
 import { ChatView } from './views/Chat';
 import { GitView } from './views/Git';
+import { SchedulesView } from './views/Schedules';
 import { SettingsView } from './views/Settings';
 import { WorkflowView } from './views/Workflow';
 import { ThemeProvider } from './components/theme/ThemeProvider';
@@ -20,6 +21,7 @@ function Shell() {
         <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
           {route === 'chat' && <ChatView />}
           {route === 'workflow' && <WorkflowView />}
+          {route === 'schedules' && <SchedulesView />}
           {route === 'git' && <GitView />}
           {route === 'settings' && <SettingsView />}
         </main>

@@ -81,17 +81,9 @@ export function Inspector({ node, onPatch, onDelete, onInsert }: Props) {
                 <option>UTC</option>
               </select>
             </Field>
-            <Field label="启用">
-              <select
-                className="input"
-                value={node.enabled === false ? 'off' : 'on'}
-                onChange={(event) => onPatch({ enabled: event.target.value === 'on' })}
-              >
-                <option value="on">启用</option>
-                <option value="off">暂停</option>
-              </select>
-            </Field>
-            <p className="field-hint">定时调度在 M5 接入：现在「运行工作流」只是手动触发，这里的计划尚不会自动唤醒。</p>
+            <p className="field-hint">
+              这条 cron 会出现在「计划」页；新计划默认暂停，需在那边确认启用后才会自动运行。
+            </p>
           </>
         )}
 

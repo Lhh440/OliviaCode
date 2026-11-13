@@ -367,6 +367,15 @@ export async function push(dir: string, auth: GitAuth | null): Promise<string> {
   return await mustGit(dir, ['push', 'origin', 'HEAD'], { auth, timeoutMs: 120_000 });
 }
 
+/** 推送指定分支（工作流的集成结果分支不在当前工作区里，不能靠 push HEAD）。 */
+export async function pushBranch(dir: string, branch: string, auth: GitAuth | null): Promise<string> {
+  if (!branch.trim()) throw new Error('分支名不能为空');
+  return await mustGit(dir, ['push', 'origin', `${branch}:refs/heads/${branch}`], {
+    auth,
+    timeoutMs: 120_000,
+  });
+}
+
 export async function clone(
   parentDir: string,
   url: string,
