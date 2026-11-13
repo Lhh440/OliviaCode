@@ -43,6 +43,8 @@ export type TurnEvent =
       edits: PatchEditPreview[];
       adds: number;
       dels: number;
+      /** true = 策略已放行，卡片只读展示，等界面的不是用户 */
+      queued?: boolean;
     }
   | {
       type: 'file.changed';
@@ -87,6 +89,8 @@ export interface UndoResult {
   message?: string;
   /** 还能继续回退几步 */
   remaining?: number;
+  /** 二进制 / 超大文件：快照没存下内容，无法还原 */
+  skipped?: string[];
 }
 
 // —— Git ——

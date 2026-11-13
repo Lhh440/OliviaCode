@@ -220,9 +220,12 @@ export function approvalKey(name: string, rawArgs: unknown): string {
     return `run_command:${[String(args.command ?? ''), ...list].join(' ').trim()}`;
   }
   if (name === 'write_file' || name === 'apply_patch') {
-    const path = String(args.path ?? '');
-    const dir = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '.';
-    return `${name}:${dir}`;
+    // 按文件而不是目录授权：目录级规则会连带放行同目录下的所有其他文件
+    const path = String(args.path ?? '')
+      .replace(/\\/g, '/')
+      .replace(/^\/+/, '')
+      .trim();
+    return `${name}:${path || '.'}`;
   }
   return `${name}:`;
 }

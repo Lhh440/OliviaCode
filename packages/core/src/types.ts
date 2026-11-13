@@ -36,6 +36,11 @@ export interface DiffFile {
   callId?: string;
   /** 逐处接受时，每一条 edits 的预览；界面按这个生成勾选项 */
   edits?: { index: number; adds: number; dels: number; hunks: DiffHunk[] }[];
+  /**
+   * true = 已按策略自动放行的预览：只展示，不等确认。
+   * 「全部放行」下仍要让用户看见将要写什么，只是不阻塞回合。
+   */
+  queued?: boolean;
 }
 
 export type Part =
@@ -96,9 +101,9 @@ export function modelShort(id: string | undefined): string {
 }
 
 export const APPROVALS: { value: ApprovalMode; label: string; hint: string }[] = [
-  { value: 'ask', label: '每次询问', hint: '写入与命令执行前都要确认' },
-  { value: 'auto', label: '自动放行', hint: '工作区内的读写自动执行，越界仍询问' },
-  { value: 'never', label: '全部放行', hint: '不再询问，谨慎使用' },
+  { value: 'ask', label: '每次询问', hint: '写入与命令执行前都要确认，补丁逐处勾选' },
+  { value: 'auto', label: '自动放行', hint: '工作区内的写入自动执行，命令与越界仍询问' },
+  { value: 'never', label: '全部放行', hint: '不再询问，命令与推送直接执行；补丁仍会展示预览' },
 ];
 
 let seq = 0;

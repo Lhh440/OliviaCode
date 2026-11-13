@@ -359,8 +359,8 @@ export async function createBranch(dir: string, branch: string): Promise<void> {
   await mustGit(dir, ['checkout', '-b', branch]);
 }
 
-export async function pull(dir: string): Promise<string> {
-  return await mustGit(dir, ['pull', '--ff-only'], { timeoutMs: 120_000 });
+export async function pull(dir: string, auth: GitAuth | null = null): Promise<string> {
+  return await mustGit(dir, ['pull', '--ff-only'], { auth, timeoutMs: 120_000 });
 }
 
 export async function push(dir: string, auth: GitAuth | null): Promise<string> {
@@ -373,8 +373,18 @@ export async function clone(
   targetName: string,
   auth: GitAuth | null,
 ): Promise<string> {
-  const target = path.join(parentDir, targetName);
-  await mustGit(parentDir, ['clone', url, target], { auth, timeoutMs: 300_000 });
+  const name = targetName.trim();
+  // 目标名只能是一层目录名：拒绝分隔符、盘符与 ..，避免克隆到 parentDir 之外
+  if (!name || name === '.' || name === '..' || /[\\/:*?"<>|]/.test(name) || name.includes('\0')) {
+    throw new Error('目标目录名不合法：只能是一层目录名，不能含路径分隔符');
+  }
+  const parent = path.resolve(parentDir);
+  const target = path.resolve(parent, name);
+  const rel = path.relative(parent, target);
+  if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) {
+    throw new Error('目标目录必须位于所选父目录内');
+  }
+  await mustGit(parent, ['clone', url, target], { auth, timeoutMs: 300_000 });
   return target;
 }
 

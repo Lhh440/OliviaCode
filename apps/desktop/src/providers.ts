@@ -50,9 +50,14 @@ async function createGithub(input: PrInput): Promise<GitPrResult> {
 
 async function createGitcode(input: PrInput): Promise<GitPrResult> {
   const url = `https://api.gitcode.com/api/v5/repos/${input.remote.owner}/${input.remote.repo}/pulls`;
-  const response = await fetch(`${url}?access_token=${encodeURIComponent(input.token)}`, {
+  // 令牌走请求头，不进 URL：URL 会被代理日志、错误页与调试记录原样留下
+  const response = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'PRIVATE-TOKEN': input.token,
+      Authorization: `Bearer ${input.token}`,
+    },
     body: JSON.stringify({
       title: input.title,
       body: input.body,
@@ -62,7 +67,7 @@ async function createGitcode(input: PrInput): Promise<GitPrResult> {
   });
   const raw = await response.text().catch(() => '');
   if (!response.ok) {
-    return { ok: false, message: `GitCode：${raw.slice(0, 300) || `HTTP ${response.status}`}` };
+    return { ok: false, message: `GitCode：${redact(raw.slice(0, 300) || `HTTP ${response.status}`, input.token)}` };
   }
   let json: { html_url?: string; number?: number; iid?: number; pull_request?: { html_url?: string; number?: number } } = {};
   try {
@@ -78,6 +83,12 @@ async function createGitcode(input: PrInput): Promise<GitPrResult> {
       inner.html_url ??
       (number ? `${input.remote.webUrl}/merge_requests/${number}` : `${input.remote.webUrl}/pulls`),
   };
+}
+
+/** 把令牌从错误信息里抹掉，避免回显到界面或日志。 */
+function redact(text: string, token: string): string {
+  if (!token) return text;
+  return text.split(token).join('***').replace(/(https?:\/\/)[^@\s/]+@/g, '$1***@');
 }
 
 export async function createPullRequest(input: PrInput): Promise<GitPrResult> {

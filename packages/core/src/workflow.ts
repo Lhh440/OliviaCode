@@ -15,6 +15,18 @@ export interface WfNode {
   isolation?: 'sandbox' | 'worktree';
   /** trigger: 触发频率；output: 产物类型 */
   schedule?: string;
+  /** trigger: 时区（目前只用于展示，M5 定时任务接入） */
+  timezone?: string;
+  /** trigger: 是否启用（目前只用于展示） */
+  enabled?: boolean;
+  /** gate: 审批超时（分钟），超时按拒绝处理 */
+  gateTimeout?: number;
+  /** gate: 阻断条件说明，写进审批门提示 */
+  blockReason?: string;
+  /** output: 产物类型 */
+  outputKind?: 'pr' | 'report' | 'both';
+  /** output: 目标分支 */
+  targetBranch?: string;
   context?: 'clean' | 'history';
   status: NodeStatus;
   x: number;
@@ -97,6 +109,18 @@ export function makeNode(seed: NodeSeed): WfNode {
     timeout: 10,
     isolation: 'worktree',
   };
+  if (seed.kind === 'trigger') {
+    node.timezone = 'Asia/Shanghai';
+    node.enabled = true;
+  }
+  if (seed.kind === 'gate') {
+    node.gateTimeout = 30;
+    node.blockReason = '评审有未解决的高危问题，或测试未全部通过时，不允许合并。';
+  }
+  if (seed.kind === 'output') {
+    node.outputKind = 'both';
+    node.targetBranch = 'main';
+  }
   if (seed.model) node.model = seed.model;
   if (seed.prompt) node.prompt = seed.prompt;
   if (seed.tools) node.tools = seed.tools;

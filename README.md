@@ -58,9 +58,15 @@ npm start            # 构建前端 + 主进程，然后启动桌面端
 npm run dev:web        # 只跑前端，浏览器访问 http://127.0.0.1:5273
 npm run typecheck      # 前端 + 主进程严格检查
 npm run shot:pages     # 四套皮肤 + 设置/工作流/Git 截图，不需要模型
-npm run test:wf        # 工作流离线自检：并行、worktree 隔离、合并、审批门（15 条断言）
+npm test               # 构建主进程 + 跑下面两套离线自检（19 + 20 条断言）
+npm run test:exec      # 执行层：路径围栏（含链接逃逸）、大文件、快照撤销语义
+npm run test:wf        # 工作流：并行、worktree 隔离、合并、审批门、环检测
 npm run e2e:wf         # 真实 Electron 里跑一遍工作流并截图（用 mock 模型）
 ```
+
+> Electron 相关脚本统一经 `scripts/electron-run.cjs` 调起：若宿主流环境设置了
+> `ELECTRON_RUN_AS_NODE=1`，`electron` 会退化成纯 Node 模式（`app` 为 undefined），
+> 垫片会清掉该变量再启动真正的 Electron。
 
 外观相关的细节（皮肤定义、布局、截图脚本踩过的坑）见 [docs/theme.md](docs/theme.md)，工作流实现见 [docs/M4.md](docs/M4.md)。
 
@@ -122,7 +128,7 @@ apps/
 packages/
   core/             工具契约、事件类型、diff、工作流模型与运行协议（双端共用）
   exec/             执行器：路径围栏、权限、命令、快照存储
-scripts/            mock 模型端点、截图与端到端脚本
+scripts/            mock 模型端点、Electron 启动垫片、截图与端到端脚本
 ```
 
 ## 设计决定
@@ -134,6 +140,8 @@ scripts/            mock 模型端点、截图与端到端脚本
 5. **令牌不进仓库**：`safeStorage` 加密 + 子进程环境注入，任何日志都脱敏。
 6. **并行靠工作树，不靠自觉**：每个 Agent 一个 worktree、一条分支，写冲突在合并时才出现；合并串行、冲突即失败并交还给人。
 7. **审批门在合并之前**：worker 的提交只进集成分支，不动用户的工作区；人点头之后产出节点才收尾。
+8. **围栏按真实路径判断**：`fs` 工具解析符号链接 / junction 后再决定是否放行，工作区里放一个指向外部的链接也读不到外面；写入前还有 4MB 上限，宁可拒绝也不截断。
+9. **快照区分「不存在」与「没存下」**：`content: null` 不再既表示「原本没有」又表示「二进制/超大」。后者标记 `restorable: false`，撤销时跳过并提示，绝不把文件删掉。
 
 ## 路线图
 
@@ -153,9 +161,12 @@ scripts/            mock 模型端点、截图与端到端脚本
 
 - PR 已在 GitCode 上实跑通过（克隆 → 分支 → 提交 → 推送 → 创建 PR）；GitHub 路径同构但未用真实令牌验证。
 - 工作流只在 git 仓库里跑：并行隔离依赖 worktree，非 git 目录会被拒绝；合并冲突直接判运行失败，不做冲突解决 UI；结果分支不自动推送。
-- 工作流默认最多 2 次尝试（首跑 + 1 次重试），节点上的 `retries` 暂时只用作开关。
+- 工作流节点每次执行（含重试）都从 `HEAD` 重开 worktree，成功或失败都会回收；但**异常杀进程**可能留下 worktree 元数据，`git worktree prune` 可清。
+- 触发器上的「频率 / 时区 / 启用」目前只是配置，不会自动唤醒工作流——定时调度在 M5。
 - 克隆只支持 HTTPS + 令牌，SSH 密钥托管未做。
-- 命令以参数数组启动、不经过 shell，管道与重定向需要显式 `cmd /c` 或 `sh -c`。
+- 命令以参数数组启动、不经过 shell，管道与重定向需要显式 `cmd /c` 或 `sh -c`。**命令进程本身不受围栏约束**（它能访问整台机器），围栏只管 `fs` 工具与工作目录；这是已知边界，别把「全部放行 + 命令执行」交给不信任的模型。
+- 单文件写入上限 4MB；超过的快照只标记不可还原（撤销时跳过并提示），不会冒险截断写回。
+- 渲染层还没设 Content-Security-Policy（Electron 启动会打一条安全提示）；当前只加载本地 `dist`、不发外部请求，风险面小，但正式分发前应补上（注意 dev 模式下 Vite HMR 需要放宽 `connect-src`）。
 - 不做 rebase、submodule、LFS，也不提供 force push / `reset --hard`。
 
 ## 许可

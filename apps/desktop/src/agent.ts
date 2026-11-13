@@ -485,6 +485,7 @@ function collectParts(parts: Part[], event: TurnEvent): void {
           state: 'pending',
           callId: event.callId,
           edits: event.edits,
+          queued: event.queued,
         },
       });
       break;
@@ -629,20 +630,29 @@ async function runAgentLoop(options: AgentOptions): Promise<void> {
       const mutating = spec ? isMutating(call.name) : false;
       const allowedByPolicy = spec ? policyAllows(policyFile, call.name, args) : false;
       const isPatch = call.name === 'apply_patch';
-      const patchAsk = isPatch && options.approval === 'ask' && !allowedByPolicy;
-      const mustAsk =
-        Boolean(spec) &&
-        mutating &&
-        !allowedByPolicy &&
-        !isPatch &&
-        (options.approval === 'ask' ||
-          (options.approval === 'auto' && spec?.risk === 'exec'));
+      const approvalMode = options.approval;
+
+      /**
+       * 审批语义：
+       * - ask  ：写 / 执行都问；补丁还有逐处勾选
+       * - auto ：工作区内写入自动放行（补丁照样出只读预览，让人看见改了啥），越权命令仍问
+       * - never：不再询问，命令与推送直接执行，但补丁预览绝不省略——差别只在「等不等你点」
+       */
+      const needsApproval = Boolean(spec) && mutating && !allowedByPolicy &&
+        (approvalMode === 'ask' || (approvalMode === 'auto' && spec?.risk === 'exec'));
+      const patchMode: 'interactive' | 'queued' | null = isPatch && !allowedByPolicy
+        ? approvalMode === 'ask'
+          ? 'interactive'
+          : approvalMode === 'auto' || approvalMode === 'never'
+            ? 'queued'
+            : null
+        : null;
 
       // 一次调用只发一条 tool.request，避免界面出现两张重复卡
       emit({
         type: 'tool.request',
         call: { callId: call.id, name: call.name, risk: spec?.risk ?? 'read', detail, args },
-        needsApproval: mustAsk,
+        needsApproval,
       });
 
       let decision: 'auto' | ApprovalDecision = 'auto';
@@ -654,8 +664,8 @@ async function runAgentLoop(options: AgentOptions): Promise<void> {
       } else if (blocked) {
         decision = 'reject';
         blockedReason = `这个节点没有被授予 ${call.name} 权限（可用：${(options.tools ?? []).join(' / ') || '无'}），换个做法或者跳过。`;
-      } else if (patchAsk) {
-        // 逐处接受：先出预览，由用户勾选要应用哪几条
+      } else if (patchMode === 'interactive' || patchMode === 'queued') {
+        // 先出预览：逐处接受模式等你勾选；自动放行模式展示后直接应用
         try {
           const rel = String(args.path ?? '');
           const before = await readFile(policy, rel, 4 * 1024 * 1024);
@@ -668,18 +678,32 @@ async function runAgentLoop(options: AgentOptions): Promise<void> {
           const previews = previewEdits(before, edits);
           const adds = previews.reduce((sum, item) => sum + item.adds, 0);
           const dels = previews.reduce((sum, item) => sum + item.dels, 0);
-          emit({ type: 'file.proposed', callId: call.id, path: rel, edits: previews, adds, dels });
-          const answer = await options.requestPatch({
+          const queued = patchMode === 'queued';
+          emit({
+            type: 'file.proposed',
             callId: call.id,
             path: rel,
             edits: previews,
             adds,
             dels,
+            queued,
           });
-          if (!answer || answer.length === 0) {
-            decision = 'reject';
+          if (queued) {
+            // 策略已放行：不等界面应答，但要等界面把预览挂上
+            acceptedEdits = previews.map((item) => item.index);
           } else {
-            acceptedEdits = answer;
+            const answer = await options.requestPatch({
+              callId: call.id,
+              path: rel,
+              edits: previews,
+              adds,
+              dels,
+            });
+            if (!answer || answer.length === 0) {
+              decision = 'reject';
+            } else {
+              acceptedEdits = answer;
+            }
           }
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
@@ -692,7 +716,7 @@ async function runAgentLoop(options: AgentOptions): Promise<void> {
           });
           continue;
         }
-      } else if (mustAsk) {
+      } else if (needsApproval) {
         const answer = await options.requestApproval({
           callId: call.id,
           name: call.name,
@@ -703,7 +727,7 @@ async function runAgentLoop(options: AgentOptions): Promise<void> {
         decision = answer;
         if (answer === 'always') {
           const key = await rememberRule(policy.root, call.name, args);
-          policyFile.allow.push(key);
+          if (!policyFile.allow.includes(key)) policyFile.allow.push(key);
         }
       }
 

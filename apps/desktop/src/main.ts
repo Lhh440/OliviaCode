@@ -73,6 +73,11 @@ ipcMain.on('olivia:env', (event) => {
   event.returnValue = readEnv();
 });
 
+/** 渲染层的皮肤明暗同步给原生控件（select / 滚动条 / 菜单） */
+ipcMain.on('olivia:theme', (_event, mode: 'light' | 'dark') => {
+  nativeTheme.themeSource = mode === 'dark' ? 'dark' : 'light';
+});
+
 function createWindow(): void {
   const win = new BrowserWindow({
     width: 1480,
@@ -133,13 +138,13 @@ ipcMain.handle(
   'olivia:task.undo',
   async (_event, args: { taskId: string; workspace: string; snapshotId?: string }) => {
     const check = await checkWorkspace(args.workspace);
-    if (!check.ok) return { ok: false, paths: [], message: check.message, remaining: 0 };
+    if (!check.ok) return { ok: false, paths: [], message: check.message, remaining: 0, skipped: [] };
     const policy: Policy = { mode: 'workspace-write', root: args.workspace };
     const snapshot = args.snapshotId
       ? await snapshots.get(args.taskId, args.snapshotId)
       : await snapshots.latest(args.taskId);
     if (!snapshot) {
-      return { ok: false, paths: [], message: '这个任务还没有可撤销的写入', remaining: 0 };
+      return { ok: false, paths: [], message: '这个任务还没有可撤销的写入', remaining: 0, skipped: [] };
     }
     const paths = await snapshots.restore(snapshot, policy);
     await snapshots.markUndone(args.taskId, snapshot.id);
@@ -151,7 +156,26 @@ ipcMain.handle(
     }
     const remaining = await snapshots.remaining(args.taskId);
     await sessions.append(args.taskId, { at: Date.now(), type: 'undo', snapshotId: snapshot.id });
-    return { ok: true, paths, remaining };
+    if (paths.paths.length === 0) {
+      return {
+        ok: false,
+        paths: [],
+        remaining,
+        skipped: paths.skipped,
+        message: paths.skipped.length
+          ? `这些文件的内容没有存进快照（二进制或超过 2MB），无法还原：${paths.skipped.join('、')}`
+          : '快照里没有可还原的文件',
+      };
+    }
+    return {
+      ok: true,
+      paths: paths.paths,
+      remaining,
+      skipped: paths.skipped,
+      message: paths.skipped.length
+        ? `有 ${paths.skipped.length} 个文件内容未存进快照，已跳过：${paths.skipped.join('、')}`
+        : undefined,
+    };
   },
 );
 
@@ -312,10 +336,12 @@ ipcMain.handle(
       signal: controller.signal,
       requestGate: (node) =>
         new Promise<boolean>((resolve) => {
+          // 节点上的 timeout 是分钟；默认 30 分钟，超时按拒绝处理（并留一条日志）
+          const minutes = Math.max(1, Math.min(120, Number(node.gateTimeout ?? node.timeout ?? 30)));
           const timer = setTimeout(() => {
             gates.delete(node.id);
             resolve(false);
-          }, 30 * 60_000);
+          }, minutes * 60_000);
           gates.set(node.id, (approved) => {
             clearTimeout(timer);
             gates.delete(node.id);
@@ -452,11 +478,9 @@ ipcMain.handle('olivia:git.pull', async (_event, args: { dir: string }) => {
   const status = await readStatus(args.dir);
   const provider = status.remote?.provider;
   const token = provider ? vault.token(provider) : null;
-  if (provider && !token) return { ok: false, message: '还没有保存该平台的令牌' };
   try {
-    const output = await withAuthEnv(token && provider ? { provider, token } : null, () =>
-      pull(args.dir),
-    );
+    // 认证走 git.ts 的进程内环境变量注入（GIT_CONFIG_*），不写任何配置文件
+    const output = await pull(args.dir, provider && token ? { provider, token } : null);
     return { ok: true, output, conflicts: await conflicts(args.dir) };
   } catch (error) {
     return {
@@ -518,32 +542,6 @@ ipcMain.handle(
     }
   },
 );
-
-/** pull 需要认证时临时注入环境，避免把令牌写进任何配置。 */
-async function withAuthEnv<T>(
-  auth: { provider: GitProvider; token: string } | null,
-  run: () => Promise<T>,
-): Promise<T> {
-  const previousValue = process.env.GIT_CONFIG_VALUE_0;
-  const previousCount = process.env.GIT_CONFIG_COUNT;
-  if (auth?.token) {
-    const user = auth.provider === 'github' ? 'x-access-token' : 'oauth2';
-    process.env.GIT_CONFIG_COUNT = '1';
-    process.env.GIT_CONFIG_KEY_0 = 'http.extraHeader';
-    process.env.GIT_CONFIG_VALUE_0 = `Authorization: Basic ${Buffer.from(
-      `${user}:${auth.token}`,
-      'utf8',
-    ).toString('base64')}`;
-  }
-  try {
-    return await run();
-  } finally {
-    if (previousValue === undefined) delete process.env.GIT_CONFIG_VALUE_0;
-    else process.env.GIT_CONFIG_VALUE_0 = previousValue;
-    if (previousCount === undefined) delete process.env.GIT_CONFIG_COUNT;
-    else process.env.GIT_CONFIG_COUNT = previousCount;
-  }
-}
 
 app.whenReady().then(() => {
   sessions = new SessionStore(path.join(app.getPath('userData'), 'sessions'));

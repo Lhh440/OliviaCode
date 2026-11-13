@@ -26,6 +26,12 @@ contextBridge.exposeInMainWorld('olivia', {
   platform: process.platform,
   desktop: true,
   env,
+  theme: {
+    /** 把当前皮肤明暗同步给原生控件，避免暗色皮肤配亮色下拉框 */
+    set: (mode: 'light' | 'dark'): void => {
+      ipcRenderer.send('olivia:theme', mode);
+    },
+  },
   workspace: {
     pick: (): Promise<string | null> => ipcRenderer.invoke('olivia:workspace.pick'),
     check: (dir: string): Promise<WorkspaceCheck> =>
