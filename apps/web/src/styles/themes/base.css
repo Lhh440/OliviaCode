@@ -4,18 +4,12 @@
 
 @layer base {
   :root {
-    --olivia-bg: #f2efe8;
-    --olivia-ink: #16181f;
-    --olivia-accent: #2f5bd7;
-    --olivia-gold: #a8853f;
-    color-scheme: light;
-  }
-
-  .dark {
-    --olivia-bg: #07060a;
-    --olivia-ink: #efe9e0;
-    --olivia-accent: #f0354a;
-    --olivia-gold: #e0b45a;
+    --olivia-bg: #070c11;
+    --olivia-ink: #e6eef3;
+    --olivia-accent: #6ea6c9;
+    --olivia-accent-rgb: 110,166,201;
+    --olivia-gold: #c9b48a;
+    --olivia-scrim: 7, 13, 19;
     color-scheme: dark;
   }
 
@@ -40,15 +34,11 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     overflow: hidden;
-    transition: background-color 0.45s ease, color 0.45s ease;
+    transition: background-color 0.6s ease, color 0.6s ease;
   }
 
   ::selection {
-    background: rgba(47, 91, 215, 0.2);
-  }
-
-  .dark ::selection {
-    background: rgba(240, 53, 74, 0.3);
+    background: rgba(var(--olivia-accent-rgb), 0.32);
   }
 
   /* 古典衬线标题 */
@@ -109,54 +99,6 @@
 }
 
 @layer components {
-  /* 版画本体：空闲显形，对话退隐（浓度按皮肤给） */
-  :root[data-skin='angel'] {
-    --art-idle: 0.5;
-    --art-work: 0.2;
-    --wash-idle: 0.42;
-    --wash-work: 0.2;
-  }
-
-  :root[data-skin='collage'] {
-    --art-idle: 0.5;
-    --art-work: 0.15;
-    --wash-idle: 0.5;
-    --wash-work: 0.24;
-  }
-
-  :root[data-skin='lily'] {
-    --art-idle: 0.56;
-    --art-work: 0.24;
-    --wash-idle: 0.38;
-    --wash-work: 0.2;
-  }
-
-  :root[data-skin='madonna'] {
-    --art-idle: 0.55;
-    --art-work: 0.2;
-    --wash-idle: 0.46;
-    --wash-work: 0.22;
-  }
-
-  .art-plate {
-    opacity: var(--art-idle, 0.5);
-    transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1);
-    will-change: opacity;
-  }
-
-  .art-wash {
-    opacity: var(--wash-idle, 0.42);
-    transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1);
-  }
-
-  :root[data-density='work'] .art-plate {
-    opacity: var(--art-work, 0.2);
-  }
-
-  :root[data-density='work'] .art-wash {
-    opacity: var(--wash-work, 0.2);
-  }
-
   /* 小字距标签 */
   .eyebrow {
     @apply text-[9.5px] font-medium uppercase tracking-[0.22em];
@@ -487,4 +429,58 @@
       transparent 100%
     );
   }
+}
+
+/* —— 主题强调色覆盖 ——
+   Tailwind 的 dark-accent / dark-gold 是编译期常量，这里用主题变量覆盖最常见的原子类，
+   让按钮、图标、选中态真的跟着主题走（含半透明底色）。 */
+.dark .text-dark-accent,
+.dark .text-light-accent {
+  color: var(--olivia-accent);
+}
+
+.dark .bg-dark-accent,
+.dark .bg-light-accent {
+  background-color: var(--olivia-accent);
+}
+
+.dark .border-dark-accent,
+.dark .border-light-accent {
+  border-color: var(--olivia-accent);
+}
+
+.dark .text-dark-gold,
+.dark .text-light-gold {
+  color: var(--olivia-gold);
+}
+
+.dark .bg-dark-gold,
+.dark .bg-light-gold {
+  background-color: var(--olivia-gold);
+}
+
+.dark .border-dark-gold,
+.dark .border-light-gold {
+  border-color: var(--olivia-gold);
+}
+
+.dark .bg-dark-accent\/10 {
+  background-color: rgba(var(--olivia-accent-rgb), 0.1);
+}
+
+.dark .bg-dark-accent\/15 {
+  background-color: rgba(var(--olivia-accent-rgb), 0.15);
+}
+
+.dark .bg-dark-gold\/12 {
+  background-color: color-mix(in srgb, var(--olivia-gold) 12%, transparent);
+}
+
+.dark .text-dark-accent\/70 {
+  color: color-mix(in srgb, var(--olivia-accent) 70%, transparent);
+}
+
+/* 暗色玻璃 UI 统一底：主题只换背景与强调色，不换表面材质 */
+:root.dark {
+  --olivia-surface: rgba(12, 17, 22, 0.72);
 }

@@ -635,10 +635,11 @@ export function ChatView() {
       </header>
 
       {/* ——— 对话区：不设外框，内容直接浮在版画上（背景若隐若现） ——— */}
-      <div className="flex-1 min-h-0 px-6 pt-3 pb-1">
+      <div className="relative flex-1 min-h-0 px-6 pt-3 pb-1">
+        <div className="chat-veil" aria-hidden="true" />
         <div
           ref={scrollRef}
-          className="h-full w-full max-w-[860px] mx-auto overflow-y-auto px-1 flex flex-col isolate"
+          className="relative h-full w-full max-w-[860px] mx-auto overflow-y-auto px-1 flex flex-col isolate"
         >
           {isEmpty ? (
             <div className="m-auto w-full max-w-2xl py-6">

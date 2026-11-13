@@ -1,29 +1,21 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { DEFAULT_SKIN_ID, pairedSkin, skinById, type Skin, type SkinMode } from '../components/theme/skins';
+import { DEFAULT_THEME_ID, hexToRgb, themeById, type ThemePreset } from '../components/theme/themes';
 
 interface ThemeContextType {
-  skin: Skin;
-  /** 当前皮肤的明暗（由皮肤本身决定） */
-  mode: SkinMode;
-  setSkin: (id: string) => void;
-  /** 在同一组的亮/暗之间切换 */
-  toggleMode: () => void;
+  theme: ThemePreset;
+  setTheme: (id: string) => void;
 }
 
 export const ThemeContext = createContext<ThemeContextType | null>(null);
 
-const STORAGE_KEY = 'olivia.skin';
-const LEGACY_KEY = 'olivia.theme';
+const STORAGE_KEY = 'olivia.theme.v3';
+const LEGACY_KEYS = ['olivia.skin', 'olivia.theme'];
 
 function readInitial(): string {
-  if (typeof window === 'undefined') return DEFAULT_SKIN_ID;
+  if (typeof window === 'undefined') return DEFAULT_THEME_ID;
   const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored) return stored;
-  // 兼容旧版本只存了 light / dark 的情况
-  const legacy = localStorage.getItem(LEGACY_KEY);
-  if (legacy === 'dark') return 'collage';
-  if (legacy === 'light') return 'angel';
-  return DEFAULT_SKIN_ID;
+  if (stored) return themeById(stored).id;
+  return DEFAULT_THEME_ID;
 }
 
 export function useTheme(): ThemeContextType {
@@ -32,26 +24,26 @@ export function useTheme(): ThemeContextType {
   return context;
 }
 
-export function useThemeState(): [Skin, (id: string) => void] {
-  const [skinId, setSkinId] = useState<string>(readInitial);
-  const skin = skinById(skinId);
+export function useThemeState(): [ThemePreset, (id: string) => void] {
+  const [themeId, setThemeId] = useState<string>(readInitial);
+  const theme = themeById(themeId);
 
   useEffect(() => {
     const root = document.documentElement;
-    root.dataset.skin = skin.id;
-    if (skin.mode === 'dark') root.classList.add('dark');
-    else root.classList.remove('dark');
-    // 每套皮肤换掉主强调色，按钮/焦点/标题跟着变
-    root.style.setProperty('--olivia-accent', skin.accent);
-    root.style.setProperty('--olivia-accent-strong', skin.accentStrong);
-    root.style.setProperty('--olivia-gold', skin.gold);
-    // 原生控件（select / 滚动条 / 菜单）跟着皮肤明暗走
-    window.olivia?.theme?.set(skin.mode);
-    localStorage.setItem(STORAGE_KEY, skin.id);
-    localStorage.removeItem(LEGACY_KEY);
-  }, [skin]);
+    root.dataset.theme = theme.id;
+    // 只有一套暗色玻璃 UI：固定 dark，不再有亮暗切换
+    root.classList.add('dark');
+    root.style.setProperty('--olivia-accent', theme.palette.accent);
+    root.style.setProperty('--olivia-accent-rgb', hexToRgb(theme.palette.accent));
+    root.style.setProperty('--olivia-accent-strong', theme.palette.accentStrong);
+    root.style.setProperty('--olivia-gold', theme.palette.gold);
+    root.style.setProperty('--olivia-ink', theme.palette.ink);
+    root.style.setProperty('--olivia-bg', theme.palette.bg);
+    root.style.setProperty('--olivia-scrim', theme.scrimColor);
+    window.olivia?.theme?.set('dark');
+    localStorage.setItem(STORAGE_KEY, theme.id);
+    for (const key of LEGACY_KEYS) localStorage.removeItem(key);
+  }, [theme]);
 
-  return [skin, setSkinId];
+  return [theme, setThemeId];
 }
-
-export { pairedSkin };

@@ -9,6 +9,7 @@ import { SettingsView } from './views/Settings';
 import { WorkflowView } from './views/Workflow';
 import { ThemeProvider } from './components/theme/ThemeProvider';
 import { BackgroundLayer } from './components/theme/BackgroundLayer';
+import { RippleLayer } from './components/theme/RippleLayer';
 import { Frame } from './components/theme/Frame';
 
 function Shell() {
@@ -29,6 +30,7 @@ function Shell() {
         </main>
       </div>
 
+      <RippleLayer />
       <Frame />
     </div>
   );

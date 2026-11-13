@@ -1,6 +1,6 @@
 {
   "name": "oliviacode",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "private": true,
   "description": "OliviaCode — 本地优先的 AI 编程工作站",
   "workspaces": [
@@ -30,6 +30,7 @@
     "@types/node": "20.19.43",
     "electron": "33.2.0",
     "esbuild": "0.21.5",
+    "ffmpeg-static": "^5.3.0",
     "typescript": "5.6.3"
   }
 }

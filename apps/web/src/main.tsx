@@ -1,8 +1,10 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
+import './styles/fonts.css';
 import './styles/themes/base.css';
 import './styles/themes/legacy.css';
+import './styles/theme-scene.css';
 import './styles/workflow.css';
 import './styles/git.css';
 import './styles/schedules.css';

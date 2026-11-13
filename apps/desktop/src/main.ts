@@ -731,7 +731,7 @@ ipcMain.handle('olivia:skills.load', async (_event, args: { workspace: string; n
 app.whenReady().then(async () => {
   sessions = new SessionStore(path.join(app.getPath('userData'), 'sessions'));
   snapshots = new SnapshotStore(path.join(app.getPath('userData'), 'snapshots'));
-  nativeTheme.themeSource = 'light';
+  nativeTheme.themeSource = 'dark';
 
   /**
    * M6：MCP 连接管理器。配置在机器级（不进仓库），密钥引用走保险箱；

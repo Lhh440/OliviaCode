@@ -38,7 +38,7 @@ const NAV: { id: Route; icon: string; label: string }[] = [
 export function Sidebar({ route }: { route: Route }) {
   const { state, dispatch } = useStore();
   const { tasks, activeId, settings } = state;
-  const { skin, toggleMode } = useTheme();
+  const { theme } = useTheme();
   const activeTask = tasks.find((task) => task.id === activeId);
   const workspace = activeTask?.workspace;
   const workspaceName = workspace ? workspace.split(/[\\/]/).filter(Boolean).pop() : '本地工作区';
@@ -76,30 +76,10 @@ export function Sidebar({ route }: { route: Route }) {
               OliviaCode
             </span>
             <span className="block text-[10px] tracking-[0.14em] uppercase text-light-inkFaint dark:text-dark-inkFaint">
-              {skin.name} · 0.7
+              {theme.name} · 0.8
             </span>
           </span>
           <ThemePicker />
-          <motion.button
-            onClick={toggleMode}
-            whileHover={{ scale: 1.08 }}
-            whileTap={{ scale: 0.92 }}
-            className="w-7 h-7 shrink-0 grid place-items-center rounded-lg text-light-inkMuted dark:text-dark-inkMuted hover:bg-black/[0.05] dark:hover:bg-white/[0.08] hover:text-light-ink dark:hover:text-dark-ink transition-colors"
-            title={skin.mode === 'light' ? '切到本组的暗色主题' : '切到本组的亮色主题'}
-          >
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.span
-                key={skin.mode}
-                initial={{ opacity: 0, rotate: -90, scale: 0.6 }}
-                animate={{ opacity: 1, rotate: 0, scale: 1 }}
-                exit={{ opacity: 0, rotate: 90, scale: 0.6 }}
-                transition={{ duration: 0.2 }}
-                className="grid place-items-center"
-              >
-                <Icon name={skin.mode === 'light' ? 'moon' : 'sun'} size={14} />
-              </motion.span>
-            </AnimatePresence>
-          </motion.button>
         </div>
       </div>
 
@@ -229,7 +209,7 @@ export function Sidebar({ route }: { route: Route }) {
               演示模式
             </span>
           )}
-          <span className="text-light-inkFaint dark:text-dark-inkFaint">M2+M3+M4+M5+M6</span>
+          <span className="text-light-inkFaint dark:text-dark-inkFaint">M2–M7 · 动态主题</span>
         </div>
       </div>
     </aside>

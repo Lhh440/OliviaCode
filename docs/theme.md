@@ -1,58 +1,80 @@
-# M3.5 · 四套皮肤与布局改版
+# M6.5 · 动态主题与视觉重做
 
-> M3 之后先把「长得像 Codex」这件事做扎实：主题从两套（light/dark）扩成四套完整皮肤，
-> 侧栏、输入框、消息流重新排布，设置页从旧样式表迁到 Tailwind，旧的 `shell.css` / `theme.css` 退休。
+> M3.5 那套「四套静态皮肤 + 亮暗成对」已经全部下线。现在只有**一个主题维度：背景**。
+> 背景是一段循环播放的水墨动画（或一张静态图），切换时交叉渐隐；界面统一暗色玻璃，强调色跟着主题走。
 
-## 四套皮肤
+## 三套主题
 
-每套皮肤 = 一张版画底图 + 一层纹样 + 一组强调色。亮暗成对，组内一键互换。
+| id | 名字 | 类型 | 素材 | 强调色 | 遮罩 |
+| --- | --- | --- | --- | --- | --- |
+| `ink-abyss` | 临渊 | 动态视频 | `ink-abyss.mp4`（水墨 · 苍青 · 鹤影） | `#5d94b8` | 0.52 |
+| `ink-mist` | 烟雨 | 动态视频 | `ink-mist.mp4`（水墨 · 苔青 · 檐下） | `#6f9a78` | 0.54 |
+| `sakura` | 花影 | 静态图 | `sakura.jpg`（四月 · 樱） | `#b5617a` | 0.6 |
 
-| id | 名字 | 明暗 | 组 | 底图 | 强调色 | 纹样 |
-| --- | --- | --- | --- | --- | --- | --- |
-| `angel` | 钴蓝天使 | 亮 | 工坊 atelier | `light-angel.jpg` | `#2f5bd7` 钴蓝 | 放射日光 |
-| `collage` | 朱红拼贴 | 暗 | 工坊 atelier | `dark-surreal.jpg` | `#f0354a` 朱砂 | 眼轮 |
-| `lily` | 白百合 | 亮 | 祷歌 litany | `lily-litany.jpg` | `#413b33` 墨褐 | 蕾丝 |
-| `madonna` | 荆棘圣母 | 暗 | 祷歌 litany | `madonna-gloria.jpg` | `#d8323f` 深红 | 星屑 |
+- 素材放在 `apps/web/public/backgrounds/`，由 `themeAsset()` 拼 `${BASE_URL}backgrounds/…`，
+  这样 dev（`/`）与打包（`./`）都能取到。
+- 视频原始素材是 4K 60fps、单段 56MB；用 `ffmpeg-static` 转成 1440 宽 / 30fps / crf30 / 无音轨后
+  是 **2.83MB 与 1.78MB**，顺带抽了同名的 `.jpg` 当封面（`poster`）。
+- 静图是低分辨率素材，用 `blur(1.5px)` + 慢速推镜（52s Ken Burns）掩盖放大痕迹。
 
-- 切换方式：侧栏调色板图标打开主题面板；月亮/太阳按钮在**同组内**亮暗互换。
-- 选择存在 `localStorage['olivia.skin']`；旧版本只存 `olivia.theme`（light/dark），首次加载时自动映射到 `angel` / `collage` 并清掉旧键。
-- 皮肤决定 `document.documentElement.dataset.skin` 与 `.dark` 类，同时把 `--olivia-accent` / `--olivia-accent-strong` / `--olivia-gold` 三个 CSS 变量写到根节点上；组件里的 `var(--olivia-accent)` 跟着变。
+## 只有一套明暗
 
-皮肤定义在 `apps/web/src/components/theme/skins.ts` 一个数组里，加一套皮肤只需要：
+- 亮色彻底移除：`document.documentElement` 永远带 `.dark`，原生控件由 `nativeTheme.themeSource = 'dark'` 固定。
+- 侧栏不再有月亮/太阳按钮；`olivia.skin` / `olivia.theme` 旧键在首次加载时清掉，新键是 `olivia.theme.v3`。
+- Tailwind 的 `dark-*` 调色板改成中性石墨（`#0a0e12` / `#eef2f4`），所有主题共用同一套表面材质；
+  只有强调色、鎏金与页面底色随主题变。
 
-1. 往 `apps/web/src/assets/backgrounds/` 放一张底图；
-2. 在 `SKINS` 里加一条（`art` 控制位置、滤镜、混色、遮罩起点，`box`/`fadeY` 用于极宽的横带图）；
-3. 在 `FAMILIES` 的映射里确认它属于哪个组——同组必须一亮一暗，否则 `pairedSkin` 会退回自己。
+## 强调色怎么生效
 
-## 布局
+Tailwind 的颜色是编译期常量，所以 `dark-accent` / `dark-gold` 这类原子类由 `base.css` 末尾的一层覆盖
+改成读 `var(--olivia-accent)` / `var(--olivia-gold)`（含常见的半透明变体）。
+组件里原本就写 `var(--olivia-accent)` 的地方（按钮、品牌标、装饰线）不用改。
 
-- **侧栏**：品牌区（Logo + 皮肤名 + 主题/明暗按钮）→ 新建任务 → 四个导航（任务/工作流/Git/设置）→ 按状态分组的任务列表 → 底部工作区与「演示模式」标记。
-- **对话**：欢迎页居中（标题 + 四张起步卡 + 绑定工作区），有消息后切成单栏消息流；输入框一体化——模型、审批策略、项目位置、发送/停止都在框内，底部一行显示轮次、步数、token 与上下文占用。
-- **面板**：统一到 `.panel` / `.panel-strong` / `.field-input` / `.btn-solid` 这组原语，写在 `styles/themes/base.css` 的 `@layer components` 里，亮暗各一套 `light:` / `dark:` 变体。
-- **设置**：四张卡片（模型接入 / 执行与审批 / Git 凭据 / 关于）全部用 Tailwind + framer-motion 重写，旧的 `.settings-page` / `.card` 样式表已删除。
+## 渐显与切换
 
-## 截图
+`BackgroundLayer` 同时挂两层：旧主题留在下面，新主题从 `opacity 0 → 1` 淡入（1.5s，带一点去饱和），
+1.6s 后卸载旧层，视觉上是**交叉溶解**。
+视频 `canplay` 之后才淡入，封面 `poster` 垫在后面，不会出现黑屏硬切。
+静图走 `scene-kenburns` 慢推镜。
 
-```bash
-npm run build:web
-electron scripts/capture-pages.cjs        # 四套首屏 + 主题面板 + 设置/工作流/Git，产物在 docs/screenshots-v3
-electron scripts/capture-v2.cjs           # 带对话态的整套截图，需要真实模型端点
-```
+## 水波纹
 
-`capture-pages.cjs` 不需要模型，跑完可以直接提交。写这类截图脚本时有两个 Electron 的坑，已在脚本里处理：
+`RippleLayer` 是一块 `pointer-events: none` 的全屏 canvas：每次 `pointerdown` 在点击处画三圈扩散水纹
+外加一点中心高光，1.15s 淡出；没有波纹时停掉 rAF，不空转。
+颜色取 `--olivia-accent-rgb`（主题切换后自动跟随）；`prefers-reduced-motion` 下整层关闭。
 
-1. **隐藏窗口不推进 rAF**：`show: false` 时 framer-motion 的淡入会停在 `opacity: 0`，截出来是空面板。脚本里 `setBackgroundThrottling(false)` 并把窗口挪到屏幕外 `showInactive()`。
-2. **CSS 过渡停在中途**：同样因为窗口不可见，`transition` 会一直「running」，拍到的是从亮色往暗色过渡途中的灰。截图前注入一段 `transition: none !important` 的样式把过渡冻住（不要连 `animation` 一起关，framer-motion 的浮层用的是 WAAPI）。
+## 可读性
+
+正文直接浮在动画上会看不清，所以：
+
+- 每套主题有一层 `scrim`（径向 + 横向 + 纵向三段渐变），按主题的 `scrim` 浓度与基色计算；
+- 对话区额外有一块 `.chat-veil`：中间压暗、左右羽化、`backdrop-filter: blur(7px)`，
+  既保证正文对比度，又让背景在两侧透出来；
+- 用户气泡改用深色玻璃（`bg-black/35` + `blur`），不再依赖亮色底。
+
+## 字体
+
+`apps/web/src/assets/fonts/AaGuDianKeBenSong.ttf`（古典刻本宋油墨版，7.6MB）通过 `styles/fonts.css`
+里的 `@font-face` 注册为 `Olivia Song`，并排在 Tailwind `fontFamily.sans` / `serif` 的第一位。
+代码块继续用 JetBrains Mono / Consolas。
+
+## 加一套主题
+
+1. 把素材丢进 `apps/web/public/backgrounds/`；
+2. 在 `components/theme/themes.ts` 的 `THEMES` 里加一条（`kind`、`file`、`poster`、`position`、`scrim`、`palette`）；
+3. 完事——`ThemePicker` 会自己多一个磁贴，颜色与水位也自动跟上。
 
 ## 验证
 
-- `npm run typecheck`：前端 + 主进程严格检查通过。
-- `npm run build:web`：496 个模块，CSS 72.8 kB（gzip 13.4 kB）。
-- 四套皮肤在 1480×940 下逐页截图核对，见 `docs/screenshots-v3/`。
+```bash
+npm run build:web          # 502 modules，CSS 87 kB(gzip 16 kB)，JS 440 kB(gzip 145 kB)
+node scripts/electron-run.cjs scripts/demo-theme.cjs   # 三套主题 + 水波纹截图，产物在 docs/screenshots-m7
+```
 
-## 两个渲染层的坑（已修，别再踩）
+`demo-theme.cjs` 会顺带断言：视频在播（`paused=false`、`readyState=4`）、图层透明度为 1、
+字体确实是 `Olivia Song`、`--olivia-accent` 跟着主题变、水波纹层存在。
 
-1. **Tailwind 会 purge 掉「拼出来的类名」**：`Markdown` 原来用 ``className={`md-h md-h${level}`}``，
-   `md-h1/2/3` 从不出现在产物 CSS 里，标题字号静默失效。现在改用 `data-level` 属性选择器。
-2. **纯 CSS 里 `@apply` 任意值不可靠**：只在 `@apply` 里引用的 `text-[16px]` 之类不会保证生成，
-   整条规则可能只剩一半声明。Markdown 区块改为原生 CSS + `theme()` / `var()`，不再依赖任意值工具类。
+## 仍然要注意的两个坑
+
+1. **Tailwind 会 purge「拼出来的类名」**：Markdown 的 `md-h${level}` 曾经整条消失，现在用 `data-level` 属性选择器。
+2. **纯 CSS 里 `@apply` 任意值不可靠**：只在 CSS 里引用的 `text-[16px]` 之类不保证生成，Markdown 区块改成了原生 CSS。

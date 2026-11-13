@@ -22,7 +22,7 @@ try {
 }
 
 contextBridge.exposeInMainWorld('olivia', {
-  version: '0.7.0',
+  version: '0.8.0',
   platform: process.platform,
   desktop: true,
   env,

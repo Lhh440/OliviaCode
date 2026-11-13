@@ -1,12 +1,13 @@
-// 纯页面截图：不依赖模型端点，覆盖四套皮肤的首屏与设置/工作流/Git 面板。
-// 用法：electron scripts/capture-pages.cjs [outDir]
+// 纯页面截图：不依赖模型端点。三套动态主题各一张对话，外加设置/工作流/Git/计划/扩展。
+// 用法：node scripts/electron-run.cjs scripts/capture-pages.cjs [outDir]
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 
 const root = path.join(__dirname, '..');
-const outDir = path.resolve(process.argv[2] || path.join(root, 'docs', 'screenshots-v3'));
+const outDir = path.resolve(process.argv[2] || path.join(root, 'docs', 'screenshots-m7'));
 const indexHtml = path.join(root, 'apps', 'web', 'dist', 'index.html');
+const THEMES = ['ink-abyss', 'ink-mist', 'sakura'];
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -17,7 +18,7 @@ ipcMain.on('olivia:env', (event) => {
 app.disableHardwareAcceleration();
 
 async function freeze(win) {
-  // 无头窗口不会推进 CSS 过渡：截图前把过渡与动画关掉，否则会拍到「半途」的颜色。
+  // 无头窗口不推进过渡：截图前把 transition 冻住，否则会拍到半途的颜色（动画保留，framer-motion 用 WAAPI）
   await win.webContents.executeJavaScript(`
     (() => {
       if (document.getElementById('__capture-freeze')) return;
@@ -28,24 +29,21 @@ async function freeze(win) {
       return true;
     })()
   `);
-  await wait(120);
+  await wait(140);
 }
 
 async function shot(win, name, ms = 900) {
   await freeze(win);
   await wait(ms);
   const image = await win.capturePage();
+  fs.mkdirSync(outDir, { recursive: true });
   fs.writeFileSync(path.join(outDir, name), image.toPNG());
   console.log(`saved ${name}`);
 }
 
-async function open(win, skin, hash, ms = 1200) {
-  if (!win.webContents.getURL()) {
-    await win.loadFile(indexHtml, { hash });
-    await wait(500);
-  }
+async function open(win, theme, hash, ms = 1500) {
   await win.webContents.executeJavaScript(
-    `localStorage.setItem('olivia.skin', ${JSON.stringify(skin)}); true`,
+    `localStorage.setItem('olivia.theme.v3', ${JSON.stringify(theme)}); true`,
   );
   await win.loadFile(indexHtml, { hash, query: { r: String(Date.now()) } });
   await wait(ms);
@@ -61,7 +59,7 @@ async function newTask(win) {
       return !!btn;
     })()
   `);
-  await wait(800);
+  await wait(900);
 }
 
 app.whenReady().then(async () => {
@@ -71,52 +69,43 @@ app.whenReady().then(async () => {
     width: 1480,
     height: 940,
     show: false,
-    backgroundColor: '#f2efe8',
+    backgroundColor: '#0a0e12',
     webPreferences: { contextIsolation: true, nodeIntegration: false },
   });
-  // 隐藏窗口默认会节流 rAF，且浮层不会进入合成结果：挪到屏幕外再显示，截图才完整。
   win.webContents.setBackgroundThrottling(false);
   win.setPosition(-2600, 0);
   win.showInactive();
   win.webContents.on('console-message', (_e, level, msg) => {
-    if (level >= 2) console.log('[page]', msg);
+    if (level >= 2) console.log('[page]', String(msg).slice(0, 160));
   });
 
   try {
-    await open(win, 'angel', '/chat');
+    await open(win, THEMES[0], '/chat');
     await win.webContents.executeJavaScript(
       'localStorage.removeItem("olivia.state.v1"); localStorage.removeItem("olivia.workflow.v1"); true',
     );
 
-    for (const skin of ['angel', 'lily', 'collage', 'madonna']) {
-      await open(win, skin, '/chat');
+    for (const theme of THEMES) {
+      await open(win, theme, '/chat', 2200);
       await newTask(win);
-      await shot(win, `${skin}-welcome.png`, 1300);
+      await shot(win, `${theme}-welcome.png`, 1500);
+      await shot(win, `${theme}-chat.png`, 600);
     }
 
-    await open(win, 'angel', '/chat');
-    const pickerOpened = await win.webContents.executeJavaScript(`
-      (() => {
-        const btn = document.querySelector('aside button[title="切换主题"]');
-        if (btn) btn.click();
-        return !!btn;
-      })()
-    `);
-    console.log('theme picker trigger:', pickerOpened);
-    await shot(win, 'theme-picker.png', 900);
+    await open(win, 'ink-mist', '/workflow', 2200);
+    await shot(win, 'ink-mist-workflow.png', 900);
 
-    for (const skin of ['lily', 'madonna']) {
-      await open(win, skin, '/settings');
-      await shot(win, `${skin}-settings.png`, 1100);
-    }
+    await open(win, 'ink-abyss', '/settings', 1600);
+    await shot(win, 'ink-abyss-settings.png', 900);
 
-    for (const skin of ['lily', 'madonna']) {
-      await open(win, skin, '/workflow', 1500);
-      await shot(win, `${skin}-workflow.png`, 900);
-    }
+    await open(win, 'ink-mist', '/extensions', 1800);
+    await shot(win, 'ink-mist-extensions.png', 900);
 
-    await open(win, 'lily', '/git', 1400);
-    await shot(win, 'lily-git.png', 900);
+    await open(win, 'ink-abyss', '/git', 1600);
+    await shot(win, 'ink-abyss-git.png', 900);
+
+    await open(win, 'sakura', '/schedules', 1800);
+    await shot(win, 'sakura-schedules.png', 900);
   } catch (error) {
     console.error('capture failed', error);
     process.exitCode = 1;

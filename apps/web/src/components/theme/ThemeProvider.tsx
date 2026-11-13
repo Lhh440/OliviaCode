@@ -1,16 +1,7 @@
-import { ReactNode } from 'react';
-import { ThemeContext, pairedSkin, useThemeState } from '../../hooks/useTheme';
+import type { ReactNode } from 'react';
+import { ThemeContext, useThemeState } from '../../hooks/useTheme';
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [skin, setSkin] = useThemeState();
-
-  const toggleMode = () => {
-    setSkin(pairedSkin(skin).id);
-  };
-
-  return (
-    <ThemeContext.Provider value={{ skin, mode: skin.mode, setSkin, toggleMode }}>
-      {children}
-    </ThemeContext.Provider>
-  );
+  const [theme, setTheme] = useThemeState();
+  return <ThemeContext.Provider value={{ theme, setTheme }}>{children}</ThemeContext.Provider>;
 }

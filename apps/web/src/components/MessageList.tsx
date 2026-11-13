@@ -463,7 +463,7 @@ export function MessageList(props: MessageListProps) {
               transition={{ duration: 0.22 }}
               className="flex flex-col items-end gap-1"
             >
-              <div className="max-w-[72%] rounded-2xl rounded-br-[6px] px-3.5 py-2 bg-black/[0.055] dark:bg-white/[0.09] border border-black/[0.04] dark:border-white/[0.06]">
+              <div className="max-w-[72%] rounded-2xl rounded-br-[6px] px-3.5 py-2 bg-black/35 dark:bg-white/[0.10] border border-white/10 dark:border-white/10 backdrop-blur-md">
                 {message.parts.map((part, index) =>
                   part.kind === 'text' ? <Markdown key={index} text={part.text} /> : null,
                 )}

@@ -1,0 +1,8 @@
+/* 古典刻本宋（用户提供的字体包），只做一种字重。 */
+@font-face {
+  font-family: 'Olivia Song';
+  src: url('../assets/fonts/AaGuDianKeBenSong.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}

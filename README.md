@@ -2,15 +2,16 @@
 
 本地优先的 AI 编程工作站。外观与交互贴近 Codex，但多了几件它不给的事：**可视化工作流、逐处接受的改动、多步回滚、Git 直连**。
 
-当前是 **M4：多智能体并行与工作流真实执行**——画布上的节点会被真正派发：每个 Agent 一个 worktree、并行改代码、跑完合并成结果分支，审批门停下来等人。前面几块（逐处接受、多步回滚、Git 直连、四套皮肤）都在，见 [docs/M4.md](docs/M4.md) 与 [docs/theme.md](docs/theme.md)。
+当前是 **M6.5：动态主题与视觉重做**——四套静态皮肤与亮暗切换全部下线，换成**动态水墨背景**（切换时交叉渐隐）、
+古典刻本宋字体、点击水波纹；M6 的 MCP 与团队技能、M5 的定时任务都在，见 [docs/theme.md](docs/theme.md)、[docs/M6.md](docs/M6.md)。
 
 <p align="center">
-  <img src="docs/screenshots-v3/lily-welcome.png" alt="白百合 · 首屏" width="49%" />
-  <img src="docs/screenshots-v3/wf-gate.png" alt="工作流运行与审批门" width="49%" />
+  <img src="docs/screenshots-m7/theme-ink-abyss.png" alt="临渊 · 水墨动态背景" width="49%" />
+  <img src="docs/screenshots-m7/theme-ink-mist.png" alt="烟雨 · 水墨动态背景" width="49%" />
 </p>
 <p align="center">
-  <img src="docs/screenshots-v3/madonna-chat.png" alt="荆棘圣母 · 对话" width="49%" />
-  <img src="docs/screenshots-v3/madonna-settings.png" alt="荆棘圣母 · 设置" width="49%" />
+  <img src="docs/screenshots-m7/theme-sakura.png" alt="花影 · 静态樱花" width="49%" />
+  <img src="docs/screenshots-m7/theme-workflow.png" alt="工作流页" width="49%" />
 </p>
 
 ## 能用的东西
@@ -24,7 +25,7 @@
 - **审批**：写文件与跑命令默认逐次询问；「始终允许」落进工作区 `.olivia/policy.json`，可提交、可审。
 - **主进程隔离**：模型调用、`fs`、命令、令牌都在主进程，渲染层只发意图、收事件。
 - **事件日志**：每个任务一份 JSONL，重启后重放消息、工具记录与 diff。
-- **四套皮肤**：钴蓝天使、朱红拼贴、白百合、荆棘圣母，亮暗成对，侧栏一键整组互换；底图、纹样、强调色都跟着换，选择记在本机。
+- **动态主题（M6.5）**：背景是循环播放的水墨动画（临渊 / 烟雨）或静态樱花，切换时交叉渐隐、视频静音；界面统一暗色玻璃，强调色随主题切换；点击任意处有水纹；字体用随包附带的古典刻本宋。
 - **工作流真实执行**：按 DAG 调度节点，agent 各开一个 git worktree 并行干活，完成后串行合并成 `olivia/wf-*` 结果分支；reviewer 在只读副本上独立评审；审批门、取消、节点级工具白名单、运行日志都在界面里。
 - **定时任务（M5）**：工作流到点自动跑，无人值守也能出结果。计划从画布上的「定时触发器」派生，主进程常驻调度；单次运行有墙钟/节点数/步数三重预算，审批门按策略（暂停并通知 / 自动批准 / 自动拒绝）处理，超限即失败关闭；每次运行落一份 Markdown 报告，按计划可选推送结果分支并开 PR。
 - **MCP 接入（M6）**：接 stdio 与 Streamable HTTP 两种传输，现代协议（`2026-07-28`，`server/discover`）与传统协议（`initialize`）双时代兼容；工具以 `mcp__<server>__<tool>` 暴露，JSON Schema 自动降级，默认按最高风险审批；只勾选的工具才会进模型上下文。
@@ -32,15 +33,8 @@
 - **离线自检**：`scripts/mock-llm.cjs` 与 `scripts/mock-mcp.cjs` 顶替模型端点与 MCP 服务器，工作流并行/隔离/合并/审批门、M5 调度语义、M6 的 MCP 双时代与技能安装全部可以离线跑通。
 
 <p align="center">
-  <img src="docs/screenshots-v3/angel-welcome.png" alt="钴蓝天使" width="24%" />
-  <img src="docs/screenshots-v3/madonna-welcome.png" alt="荆棘圣母" width="24%" />
-  <img src="docs/screenshots-v3/lily-settings.png" alt="白百合 · 设置" width="24%" />
-  <img src="docs/screenshots-v3/madonna-settings.png" alt="荆棘圣母 · 设置" width="24%" />
-</p>
-
-<p align="center">
-  <img src="docs/screenshots-v3/wf-running.png" alt="并行执行中" width="49%" />
-  <img src="docs/screenshots-v3/wf-done.png" alt="跑完后的结果分支" width="49%" />
+  <img src="docs/screenshots-m5/schedules.png" alt="计划页" width="49%" />
+  <img src="docs/screenshots-m6/extensions.png" alt="扩展页：MCP 与团队技能" width="49%" />
 </p>
 
 <p align="center">
