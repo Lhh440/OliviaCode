@@ -7,6 +7,8 @@ import type {
   TurnEnvelope,
   TurnEvent,
   TurnStartArgs,
+  WorkflowRunArgs,
+  WorkflowRunEvent,
 } from '@olivia/core';
 import { SnapshotStore, type Policy } from '@olivia/exec';
 import { runAgentTurn } from './agent';
@@ -32,6 +34,7 @@ import { createPullRequest } from './providers';
 import { SessionStore } from './sessions';
 import { checkWorkspace } from './workspace';
 import * as vault from './vault';
+import { runWorkflow } from './workflow-runner';
 
 const isDev = process.env.OLIVIA_DEV === '1';
 const headless = process.env.OLIVIA_HEADLESS === '1';
@@ -49,6 +52,13 @@ interface TurnContext {
 }
 
 const turns = new Map<string, TurnContext>();
+
+interface WorkflowRunContext {
+  abort: AbortController;
+  gates: Map<string, (approved: boolean) => void>;
+}
+
+const workflowRuns = new Map<string, WorkflowRunContext>();
 
 function readEnv(): { baseUrl: string; apiKey: string; model: string; workspace: string } {
   return {
@@ -149,7 +159,10 @@ ipcMain.handle(
 ipcMain.handle('olivia:turn.start', async (event, args: TurnStartArgs & { turnId: string }) => {
   const check = await checkWorkspace(args.workspace);
   if (!check.ok) return { ok: false, error: check.message };
-  if (!readEnv().apiKey) return { ok: false, error: '还没有配置模型密钥' };
+  const env = readEnv();
+  const apiKey = args.apiKey?.trim() || env.apiKey;
+  const baseUrl = args.baseUrl?.trim() || env.baseUrl || 'https://api.deepseek.com/v1';
+  if (!apiKey) return { ok: false, error: '还没有配置模型密钥' };
 
   const turnId = args.turnId;
   const sender = event.sender;
@@ -168,7 +181,6 @@ ipcMain.handle('olivia:turn.start', async (event, args: TurnStartArgs & { turnId
   };
 
   const policy: Policy = { mode: 'workspace-write', root: args.workspace };
-  const env = readEnv();
 
   void (async () => {
     let ok = true;
@@ -180,8 +192,8 @@ ipcMain.handle('olivia:turn.start', async (event, args: TurnStartArgs & { turnId
         prompt: args.prompt,
         history: args.history,
         model: args.model,
-        baseUrl: env.baseUrl || 'https://api.deepseek.com/v1',
-        apiKey: env.apiKey,
+        baseUrl,
+        apiKey,
         approval: args.approval,
         allowShell: args.allowShell,
         policy,
@@ -261,6 +273,84 @@ ipcMain.on('olivia:turn.cancel', (_event, args: { turnId: string }) => {
   for (const [, resolve] of turn.patches) resolve(null);
   turn.approvals.clear();
   turn.patches.clear();
+});
+
+// —— 工作流 ——
+ipcMain.handle(
+  'olivia:workflow.run',
+  async (event, args: WorkflowRunArgs & { model?: string; allowShell?: boolean }) => {
+    const env = readEnv();
+    const apiKey = args.apiKey?.trim() || env.apiKey;
+    const baseUrl = args.baseUrl?.trim() || env.baseUrl || 'https://api.deepseek.com/v1';
+    if (!apiKey) return { ok: false, error: '还没有配置模型密钥，工作流没法真跑' };
+    const check = await checkWorkspace(args.workspace);
+    if (!check.ok) return { ok: false, error: check.message };
+    if (workflowRuns.has(args.runId)) return { ok: false, error: '这次运行还在进行中' };
+
+    const controller = new AbortController();
+    const gates = new Map<string, (approved: boolean) => void>();
+    workflowRuns.set(args.runId, { abort: controller, gates });
+    const sender = event.sender;
+    const emit = (workflowEvent: WorkflowRunEvent): void => {
+      if (!sender.isDestroyed()) {
+        sender.send('olivia:workflow.event', { runId: args.runId, event: workflowEvent });
+      }
+    };
+
+    void runWorkflow({
+      runId: args.runId,
+      workflow: args.workflow,
+      workspace: args.workspace,
+      worktreeRoot: path.join(app.getPath('userData'), 'worktrees'),
+      apiKey,
+      baseUrl,
+      model: args.model || env.model || 'deepseek-v4.1-flash',
+      allowShell: Boolean(args.allowShell),
+      maxParallel: args.maxParallel,
+      snapshots,
+      emit,
+      signal: controller.signal,
+      requestGate: (node) =>
+        new Promise<boolean>((resolve) => {
+          const timer = setTimeout(() => {
+            gates.delete(node.id);
+            resolve(false);
+          }, 30 * 60_000);
+          gates.set(node.id, (approved) => {
+            clearTimeout(timer);
+            gates.delete(node.id);
+            resolve(approved);
+          });
+        }),
+    })
+      .catch((error: unknown) => {
+        emit({
+          type: 'run.done',
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      })
+      .finally(() => {
+        workflowRuns.delete(args.runId);
+      });
+
+    return { ok: true };
+  },
+);
+
+ipcMain.on(
+  'olivia:workflow.gate',
+  (_event, args: { runId: string; nodeId: string; approved: boolean }) => {
+    workflowRuns.get(args.runId)?.gates.get(args.nodeId)?.(args.approved);
+  },
+);
+
+ipcMain.on('olivia:workflow.cancel', (_event, args: { runId: string }) => {
+  const run = workflowRuns.get(args.runId);
+  if (!run) return;
+  run.abort.abort();
+  for (const [, resolve] of run.gates) resolve(false);
+  run.gates.clear();
 });
 
 // —— 凭据 ——

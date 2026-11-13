@@ -221,7 +221,7 @@ export function Sidebar({ route }: { route: Route }) {
               演示模式
             </span>
           )}
-          <span className="text-light-inkFaint dark:text-dark-inkFaint">M2+M3</span>
+          <span className="text-light-inkFaint dark:text-dark-inkFaint">M2+M3+M4</span>
         </div>
       </div>
     </aside>

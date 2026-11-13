@@ -8,6 +8,8 @@ import type {
   TurnStartArgs,
   UndoResult,
   VaultStatus,
+  WorkflowRunArgs,
+  WorkflowRunEvent,
   WorkspaceCheck,
 } from '@olivia/core';
 
@@ -34,6 +36,16 @@ declare global {
       task: {
         load: (taskId: string) => Promise<{ taskId: string; events: unknown[] }>;
         undo: (taskId: string, workspace: string, snapshotId?: string) => Promise<UndoResult>;
+      };
+      workflow: {
+        run: (
+          args: WorkflowRunArgs & { model?: string; allowShell?: boolean },
+        ) => Promise<{ ok: boolean; error?: string }>;
+        cancel: (runId: string) => void;
+        gate: (runId: string, nodeId: string, approved: boolean) => void;
+        onEvent: (
+          listener: (payload: { runId: string; event: WorkflowRunEvent }) => void,
+        ) => () => void;
       };
       vault: {
         status: () => Promise<VaultStatus>;

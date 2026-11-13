@@ -81,6 +81,8 @@ export interface AgentOptions {
   }) => Promise<PatchDecision>;
   gitToken: (provider: GitProvider) => string | null;
   signal: AbortSignal;
+  /** 允许这个节点调用的工具白名单；不传表示全部可用（普通对话）。 */
+  tools?: string[];
 }
 
 function systemPrompt(root: string, tree: string[]): string {
@@ -136,9 +138,12 @@ async function streamCompletion(
     signal: AbortSignal;
     onText: (delta: string) => void;
     onThinking: (delta: string) => void;
+    tools?: string[];
   },
 ): Promise<Completion> {
   const url = `${options.baseUrl.replace(/\/+$/, '')}/chat/completions`;
+  const allowed = options.tools;
+  const specs = allowed ? TOOLS.filter((tool) => allowed.includes(tool.name)) : TOOLS;
   const response = await fetch(url, {
     method: 'POST',
     signal: options.signal,
@@ -150,7 +155,7 @@ async function streamCompletion(
       model: options.model,
       stream: true,
       max_tokens: 4096,
-      tools: TOOLS.map((tool) => ({
+      tools: specs.map((tool) => ({
         type: 'function',
         function: {
           name: tool.name,
@@ -587,6 +592,7 @@ async function runAgentLoop(options: AgentOptions): Promise<void> {
       signal: options.signal,
       onText: (delta) => emit({ type: 'text', delta }),
       onThinking: (delta) => emit({ type: 'thinking', delta }),
+      tools: options.tools,
     });
 
     if (completion.toolCalls.length === 0) return;
@@ -618,6 +624,7 @@ async function runAgentLoop(options: AgentOptions): Promise<void> {
       }
 
       const spec = toolSpec(call.name);
+      const blocked = Boolean(spec && options.tools && !options.tools.includes(spec.name));
       const detail = describeCall(call.name, args);
       const mutating = spec ? isMutating(call.name) : false;
       const allowedByPolicy = spec ? policyAllows(policyFile, call.name, args) : false;
@@ -640,9 +647,13 @@ async function runAgentLoop(options: AgentOptions): Promise<void> {
 
       let decision: 'auto' | ApprovalDecision = 'auto';
       let acceptedEdits: number[] | undefined;
+      let blockedReason: string | undefined;
 
       if (!spec) {
         decision = 'reject';
+      } else if (blocked) {
+        decision = 'reject';
+        blockedReason = `这个节点没有被授予 ${call.name} 权限（可用：${(options.tools ?? []).join(' / ') || '无'}），换个做法或者跳过。`;
       } else if (patchAsk) {
         // 逐处接受：先出预览，由用户勾选要应用哪几条
         try {
@@ -697,10 +708,17 @@ async function runAgentLoop(options: AgentOptions): Promise<void> {
       }
 
       if (decision === 'reject') {
-        const text = isPatch
-          ? '用户没有接受这次修改。请说明改动意图，或换成更小的、更明确的补丁。'
-          : `用户拒绝执行 ${call.name}。请说明为什么需要它，或换一种不需要批准的做法。`;
-        emit({ type: 'tool.result', callId: call.id, status: 'error', summary: isPatch ? '未接受' : '已拒绝' });
+        const text =
+          blockedReason ??
+          (isPatch
+            ? '用户没有接受这次修改。请说明改动意图，或换成更小的、更明确的补丁。'
+            : `用户拒绝执行 ${call.name}。请说明为什么需要它，或换一种不需要批准的做法。`);
+        emit({
+          type: 'tool.result',
+          callId: call.id,
+          status: 'error',
+          summary: blocked ? '无权限' : isPatch ? '未接受' : '已拒绝',
+        });
         log({
           at: Date.now(),
           type: 'tool.call',

@@ -349,6 +349,8 @@ export function ChatView() {
       model: state.settings.model,
       approval: state.settings.approval,
       allowShell: state.settings.allowShell,
+      baseUrl: state.settings.baseUrl,
+      apiKey: state.settings.apiKey,
       history,
     });
 

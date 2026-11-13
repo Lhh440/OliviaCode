@@ -2,17 +2,22 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   NODE_W,
   makeNode,
+  phaseToNodeStatus,
   seedWorkflow,
   topoOrder,
   uid,
   type NodeKind,
   type WfNode,
   type Workflow,
+  type WorkflowRunEvent,
+  type WorkflowRunState,
 } from '@olivia/core';
 import { Icon } from '../icons';
+import { useStore } from '../store';
 import { Canvas, type CanvasHandle } from '../workflow/Canvas';
 import { Inspector } from '../workflow/Inspector';
 import { Library } from '../workflow/Library';
+import { RunPanel, type GatePrompt } from '../workflow/RunPanel';
 
 const STORAGE_KEY = 'olivia.workflow.v1';
 
@@ -40,6 +45,9 @@ function loadWorkflow(): Workflow {
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export function WorkflowView() {
+  const { state: store } = useStore();
+  const activeTask = store.tasks.find((task) => task.id === store.activeId) ?? null;
+  const workspace = activeTask?.workspace ?? '';
   const initial = useMemo(loadWorkflow, []);
   const [wf, setWf] = useState<Workflow>(initial);
   const [selectedId, setSelectedId] = useState<string | null>(
@@ -48,12 +56,16 @@ export function WorkflowView() {
   const [zoom, setZoom] = useState(1);
   const [runState, setRunState] = useState<'idle' | 'running' | 'waiting' | 'done'>('idle');
   const [toast, setToast] = useState<string | null>(null);
+  const [runInfo, setRunInfo] = useState<WorkflowRunState | null>(null);
+  const [gate, setGate] = useState<GatePrompt | null>(null);
+  const [panelOpen, setPanelOpen] = useState(true);
 
   const canvasRef = useRef<CanvasHandle>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const approvedRef = useRef(false);
   const cursorRef = useRef(0);
   const disposedRef = useRef(false);
+  const runIdRef = useRef<string | null>(null);
   const wfRef = useRef(wf);
   wfRef.current = wf;
 
@@ -70,6 +82,101 @@ export function WorkflowView() {
     }, 280);
     return () => clearTimeout(timer);
   }, [wf]);
+
+  const applyRunEvent = useCallback((event: WorkflowRunEvent) => {
+    if (event.type === 'run.start') {
+      setRunInfo(event.run);
+      setGate(null);
+      setPanelOpen(true);
+      setWf((prev) => ({
+        ...prev,
+        nodes: prev.nodes.map((node) => ({
+          ...node,
+          status: node.kind === 'trigger' ? ('ready' as const) : ('idle' as const),
+        })),
+      }));
+      return;
+    }
+    if (event.type === 'node.status') {
+      setRunInfo((prev) =>
+        prev
+          ? {
+              ...prev,
+              nodes: {
+                ...prev.nodes,
+                [event.nodeId]: {
+                  ...(prev.nodes[event.nodeId] ?? { nodeId: event.nodeId, phase: 'queued', attempts: 0 }),
+                  phase: event.phase,
+                  summary: event.summary ?? prev.nodes[event.nodeId]?.summary,
+                  error: event.error ?? prev.nodes[event.nodeId]?.error,
+                },
+              },
+            }
+          : prev,
+      );
+      setWf((prev) => ({
+        ...prev,
+        nodes: prev.nodes.map((node) =>
+          node.id === event.nodeId ? { ...node, status: phaseToNodeStatus(event.phase) } : node,
+        ),
+      }));
+      if (event.phase !== 'waiting') {
+        setGate((current) => (current && current.nodeId === event.nodeId ? null : current));
+        setRunState((current) => (current === 'waiting' ? 'running' : current));
+      }
+      return;
+    }
+    if (event.type === 'node.log') {
+      setRunInfo((prev) =>
+        prev
+          ? {
+              ...prev,
+              logs: [
+                ...prev.logs.slice(-199),
+                { at: Date.now(), nodeId: event.nodeId, kind: event.kind, text: event.text },
+              ],
+            }
+          : prev,
+      );
+      return;
+    }
+    if (event.type === 'gate.waiting') {
+      setGate({ nodeId: event.nodeId, title: event.title, detail: event.detail });
+      setPanelOpen(true);
+      setRunState('waiting');
+      return;
+    }
+    if (event.type === 'run.done') {
+      setRunInfo((prev) =>
+        prev
+          ? {
+              ...prev,
+              phase: event.ok ? 'done' : 'failed',
+              branch: event.branch ?? prev.branch,
+              error: event.error,
+              endedAt: Date.now(),
+            }
+          : prev,
+      );
+      setGate(null);
+      setRunState(event.ok ? 'done' : 'idle');
+      setToast(
+        event.ok
+          ? `跑完了：结果在 ${event.branch ?? '集成分支'}，可在 Git 页检查或开 PR`
+          : `运行失败：${event.error ?? '未知错误'}`,
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    const bridge = window.olivia?.workflow;
+    if (!bridge) return;
+    const off = bridge.onEvent(({ runId, event }) => {
+      if (runId !== runIdRef.current) return;
+      applyRunEvent(event);
+    });
+    return off;
+  }, [applyRunEvent]);
 
   useEffect(() => {
     return () => {
@@ -190,8 +297,76 @@ export function WorkflowView() {
     setToast(`跑完了：${order.length} 个节点，产物已生成`);
   };
 
+  const runReal = async (): Promise<boolean> => {
+    const bridge = window.olivia?.workflow;
+    if (!bridge) return false;
+    const current = wfRef.current;
+    if (!workspace) {
+      setToast('先给任务绑定一个 git 仓库：并行 Agent 要在 worktree 里跑');
+      return true;
+    }
+    if (current.nodes.length === 0) {
+      setToast('画布是空的，先从节点库拖入触发器');
+      return true;
+    }
+    if (!current.nodes.some((node) => node.kind === 'trigger')) {
+      setToast('缺少触发器：工作流得有个起点');
+      return true;
+    }
+    const runId = `wf_${Date.now().toString(36)}`;
+    runIdRef.current = runId;
+    setRunInfo({
+      id: runId,
+      workflowId: current.id,
+      workflowName: current.name,
+      workspace,
+      phase: 'running',
+      startedAt: Date.now(),
+      nodes: {},
+      logs: [],
+    });
+    setGate(null);
+    setPanelOpen(true);
+    setRunState('running');
+    setToast('开始执行：按 DAG 派发 Agent，每个 worker 一个 worktree');
+    const started = await bridge.run({
+      runId,
+      workflow: current,
+      workspace,
+      model: store.settings.model,
+      allowShell: store.settings.allowShell,
+      baseUrl: store.settings.baseUrl,
+      apiKey: store.settings.apiKey,
+      maxParallel: 3,
+    });
+    if (!started.ok) {
+      runIdRef.current = null;
+      setRunInfo(null);
+      setRunState('idle');
+      setToast(started.error ?? '工作流启动失败');
+    }
+    return true;
+  };
+
+  const decideGate = (approved: boolean) => {
+    const runId = runIdRef.current;
+    if (!runId || !gate) return;
+    window.olivia?.workflow.gate(runId, gate.nodeId, approved);
+    setGate(null);
+    setRunState(approved ? 'running' : 'idle');
+    if (!approved) setToast('已停止：集成分支里已有的提交不会被删除');
+  };
+
+  const cancelRun = () => {
+    if (runIdRef.current) window.olivia?.workflow.cancel(runIdRef.current);
+    setRunState('idle');
+    setGate(null);
+    setToast('已请求取消');
+  };
+
   const run = async () => {
     if (runState === 'running') return;
+    if (await runReal()) return;
     if (wfRef.current.nodes.length === 0) {
       setToast('画布是空的，先从节点库拖入触发器');
       return;
@@ -206,7 +381,7 @@ export function WorkflowView() {
       })),
     }));
     setRunState('running');
-    setToast('开始执行：按拓扑顺序推进');
+    setToast('浏览器预览：按拓扑顺序模拟推进');
     await sleep(120);
     await advance(0);
   };
@@ -329,15 +504,41 @@ export function WorkflowView() {
           <button
             className={`wf-run ${runState === 'waiting' ? 'approve' : ''}`}
             onClick={() => {
-              if (runState === 'waiting') void approve();
+              if (gate) decideGate(true);
+              else if (runState === 'waiting') void approve();
               else void run();
             }}
-            disabled={runState === 'running'}
+            disabled={runState === 'running' && !gate}
           >
             <Icon name="play" size={14} />
-            {runState === 'waiting' ? '批准并继续' : runState === 'running' ? '执行中…' : '运行工作流'}
+            {gate || runState === 'waiting'
+              ? '批准并继续'
+              : runState === 'running'
+                ? '执行中…'
+                : '运行工作流'}
           </button>
         </div>
+
+        {panelOpen && (
+          <RunPanel
+            run={runInfo}
+            workflow={wf}
+            gate={gate}
+            onApprove={() => decideGate(true)}
+            onReject={() => decideGate(false)}
+            onCancel={cancelRun}
+            onClose={() => setPanelOpen(false)}
+          />
+        )}
+
+        {runInfo && !panelOpen && (
+          <button
+            onClick={() => setPanelOpen(true)}
+            className="absolute left-4 bottom-16 z-30 h-8 px-3 rounded-xl border border-light-line dark:border-dark-line bg-light-panelStrong dark:bg-[rgba(18,14,20,0.94)] backdrop-blur-xl text-[11.5px] text-light-ink dark:text-dark-ink shadow-lg"
+          >
+            运行面板 · {runInfo.phase === 'running' ? '执行中' : runInfo.phase === 'done' ? '完成' : runInfo.phase}
+          </button>
+        )}
 
         {toast && <div className="toast">{toast}</div>}
       </div>

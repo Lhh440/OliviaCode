@@ -68,6 +68,9 @@ export interface TurnStartArgs {
   model: string;
   approval: ApprovalMode;
   allowShell: boolean;
+  /** 设置页里填的端点与密钥（只存渲染层内存），优先于环境变量 */
+  baseUrl?: string;
+  apiKey?: string;
   /** 最近若干轮纯文本历史，用于给模型接上下文 */
   history: { role: 'user' | 'assistant'; content: string }[];
 }

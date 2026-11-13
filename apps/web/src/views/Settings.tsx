@@ -312,13 +312,13 @@ export function SettingsView() {
           <Section icon="layers" title="关于" desc="本地优先的 AI 编程工作站。">
             <div className="divide-y divide-light-line dark:divide-dark-line">
               {[
-                { label: '版本', value: '0.5.0 · M2+M3' },
+                { label: '版本', value: '0.5.0 · M2+M3+M4' },
                 {
                   label: '运行形态',
                   value: typeof window !== 'undefined' && 'olivia' in window ? 'Electron 桌面端' : '浏览器预览',
                 },
                 { label: '仓库', value: 'gitcode.com/Olivia0703/OliviaCode' },
-                { label: '下一步', value: 'M4：多智能体并行与工作流真实执行' },
+                { label: '下一步', value: 'M5：定时任务（无人值守，出报告或提 PR）' },
               ].map((row) => (
                 <div key={row.label} className="flex items-center justify-between gap-4 py-2 first:pt-0 last:pb-0">
                   <span className="text-[11.5px] text-light-inkMuted dark:text-dark-inkMuted">{row.label}</span>

@@ -9,6 +9,8 @@ import type {
   TurnStartArgs,
   UndoResult,
   VaultStatus,
+  WorkflowRunArgs,
+  WorkflowRunEvent,
   WorkspaceCheck,
 } from '@olivia/core';
 
@@ -52,6 +54,25 @@ contextBridge.exposeInMainWorld('olivia', {
       ipcRenderer.invoke('olivia:task.load', taskId),
     undo: (taskId: string, workspace: string, snapshotId?: string): Promise<UndoResult> =>
       ipcRenderer.invoke('olivia:task.undo', { taskId, workspace, snapshotId }),
+  },
+  workflow: {
+    run: (
+      args: WorkflowRunArgs & { model?: string; allowShell?: boolean },
+    ): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('olivia:workflow.run', args),
+    cancel: (runId: string): void => {
+      ipcRenderer.send('olivia:workflow.cancel', { runId });
+    },
+    gate: (runId: string, nodeId: string, approved: boolean): void => {
+      ipcRenderer.send('olivia:workflow.gate', { runId, nodeId, approved });
+    },
+    onEvent: (
+      listener: (payload: { runId: string; event: WorkflowRunEvent }) => void,
+    ): (() => void) => {
+      const handler = (_event: unknown, payload: { runId: string; event: WorkflowRunEvent }): void =>
+        listener(payload);
+      ipcRenderer.on('olivia:workflow.event', handler);
+      return () => ipcRenderer.removeListener('olivia:workflow.event', handler);
+    },
   },
   vault: {
     status: (): Promise<VaultStatus> => ipcRenderer.invoke('olivia:vault.status'),

@@ -2,15 +2,15 @@
 
 本地优先的 AI 编程工作站。外观与交互贴近 Codex，但多了几件它不给的事：**可视化工作流、逐处接受的改动、多步回滚、Git 直连**。
 
-当前是 **M3：Git 与改动的完整闭环**——模型能读你的仓库、改文件、跑命令、提交、推送、开 PR，每一步都可见、可拒、可回滚。界面已经换成四套完整皮肤（见 [docs/theme.md](docs/theme.md)）。
+当前是 **M4：多智能体并行与工作流真实执行**——画布上的节点会被真正派发：每个 Agent 一个 worktree、并行改代码、跑完合并成结果分支，审批门停下来等人。前面几块（逐处接受、多步回滚、Git 直连、四套皮肤）都在，见 [docs/M4.md](docs/M4.md) 与 [docs/theme.md](docs/theme.md)。
 
 <p align="center">
   <img src="docs/screenshots-v3/lily-welcome.png" alt="白百合 · 首屏" width="49%" />
-  <img src="docs/screenshots-v3/madonna-chat.png" alt="荆棘圣母 · 对话" width="49%" />
+  <img src="docs/screenshots-v3/wf-gate.png" alt="工作流运行与审批门" width="49%" />
 </p>
 <p align="center">
-  <img src="docs/screenshots-v3/theme-picker.png" alt="主题面板" width="49%" />
-  <img src="docs/screenshots-v3/madonna-workflow.png" alt="工作流画布" width="49%" />
+  <img src="docs/screenshots-v3/madonna-chat.png" alt="荆棘圣母 · 对话" width="49%" />
+  <img src="docs/screenshots-v3/madonna-settings.png" alt="荆棘圣母 · 设置" width="49%" />
 </p>
 
 ## 能用的东西
@@ -25,12 +25,19 @@
 - **主进程隔离**：模型调用、`fs`、命令、令牌都在主进程，渲染层只发意图、收事件。
 - **事件日志**：每个任务一份 JSONL，重启后重放消息、工具记录与 diff。
 - **四套皮肤**：钴蓝天使、朱红拼贴、白百合、荆棘圣母，亮暗成对，侧栏一键整组互换；底图、纹样、强调色都跟着换，选择记在本机。
+- **工作流真实执行**：按 DAG 调度节点，agent 各开一个 git worktree 并行干活，完成后串行合并成 `olivia/wf-*` 结果分支；reviewer 在只读副本上独立评审；审批门、取消、节点级工具白名单、运行日志都在界面里。
+- **离线自检**：`scripts/mock-llm.cjs` 顶替模型端点，工作流的并行、隔离、合并、审批门可以完全离线跑通。
 
 <p align="center">
   <img src="docs/screenshots-v3/angel-welcome.png" alt="钴蓝天使" width="24%" />
   <img src="docs/screenshots-v3/madonna-welcome.png" alt="荆棘圣母" width="24%" />
   <img src="docs/screenshots-v3/lily-settings.png" alt="白百合 · 设置" width="24%" />
   <img src="docs/screenshots-v3/madonna-settings.png" alt="荆棘圣母 · 设置" width="24%" />
+</p>
+
+<p align="center">
+  <img src="docs/screenshots-v3/wf-running.png" alt="并行执行中" width="49%" />
+  <img src="docs/screenshots-v3/wf-done.png" alt="跑完后的结果分支" width="49%" />
 </p>
 
 <p align="center">
@@ -50,10 +57,12 @@ npm start            # 构建前端 + 主进程，然后启动桌面端
 ```bash
 npm run dev:web        # 只跑前端，浏览器访问 http://127.0.0.1:5273
 npm run typecheck      # 前端 + 主进程严格检查
-npm run shot           # 截图到 docs/screenshots
+npm run shot:pages     # 四套皮肤 + 设置/工作流/Git 截图，不需要模型
+npm run test:wf        # 工作流离线自检：并行、worktree 隔离、合并、审批门（15 条断言）
+npm run e2e:wf         # 真实 Electron 里跑一遍工作流并截图（用 mock 模型）
 ```
 
-外观相关的细节（皮肤定义、布局、截图脚本踩过的坑）见 [docs/theme.md](docs/theme.md)。
+外观相关的细节（皮肤定义、布局、截图脚本踩过的坑）见 [docs/theme.md](docs/theme.md)，工作流实现见 [docs/M4.md](docs/M4.md)。
 
 ## 接自己的模型
 
@@ -88,26 +97,32 @@ node apps/desktop/dist/selftest.cjs
 
 # 界面层：无头驱动真实窗口走完「读 → 逐处接受 → 回滚 → Git 页」并截图
 electron scripts/ui-e2e.cjs
+
+# 工作流层：mock 模型 + 临时仓库，验证并行、隔离、合并、审批门
+npm run test:wf
 ```
 
-两者都需要 `OLIVIA_BASE_URL` / `OLIVIA_API_KEY`。
+前两条需要 `OLIVIA_BASE_URL` / `OLIVIA_API_KEY`；工作流自检自带 mock 端点，不需要任何外部服务。
 
 ## 目录结构
 
 ```
 apps/
-  desktop/          Electron 主进程：agent 循环、工具、快照、事件日志、git、凭据
+  desktop/          Electron 主进程：agent 循环、工具、快照、事件日志、git、凭据、工作流
     src/agent.ts      模型流式 + 工具编排 + 审批 + 逐处接受
+    src/workflow-runner.ts  DAG 调度、worktree 隔离、分支合并、审批门
     src/git.ts        git CLI 封装、porcelain 解析、hunk 暂存
     src/vault.ts      safeStorage 令牌保险箱
     src/providers.ts  GitHub / GitCode PR
-    src/main.ts       IPC、窗口、撤销、git 接口
+    src/main.ts       IPC、窗口、撤销、git 接口、工作流运行
   web/              React + Vite 渲染层
     src/views/        Chat / Workflow / Git / Settings
     src/components/   Markdown、消息流、工具卡、逐处接受卡、审批条
+    src/workflow/     画布、检查器、运行面板
 packages/
-  core/             工具契约、事件类型、diff、工作流模型（双端共用）
+  core/             工具契约、事件类型、diff、工作流模型与运行协议（双端共用）
   exec/             执行器：路径围栏、权限、命令、快照存储
+scripts/            mock 模型端点、截图与端到端脚本
 ```
 
 ## 设计决定
@@ -117,6 +132,8 @@ packages/
 3. **改动先看后写**：`apply_patch` 先出逐处预览，用户勾选后才落盘，落盘前快照。
 4. **快照独立于 Git**：回滚不与用户的分支、暂存区纠缠；Git 的暂存与提交另走一条路。
 5. **令牌不进仓库**：`safeStorage` 加密 + 子进程环境注入，任何日志都脱敏。
+6. **并行靠工作树，不靠自觉**：每个 Agent 一个 worktree、一条分支，写冲突在合并时才出现；合并串行、冲突即失败并交还给人。
+7. **审批门在合并之前**：worker 的提交只进集成分支，不动用户的工作区；人点头之后产出节点才收尾。
 
 ## 路线图
 
@@ -127,15 +144,16 @@ packages/
 | M2 | 逐处接受、多步回滚（并入 M3） | ✅ |
 | M3 | Git 面板、令牌保险箱、提交/拉推/PR、GitHub + GitCode | ✅ 本次 |
 | M3.5 | 四套皮肤、词典式侧栏、一体化输入框、设置页 Tailwind 化 | ✅ |
-| M4 | 多智能体并行与工作流真实执行 | 下一步 |
-| M5 | 定时任务（无人值守，出报告或提 PR） | 计划 |
+| M4 | 多智能体并行与工作流真实执行 | ✅ 本次 |
+| M5 | 定时任务（无人值守，出报告或提 PR） | 下一步 |
 | M6 | MCP 接入与团队技能 | 计划 |
 | M7 | 成本与上下文面板、内置浏览器预览 | 计划 |
 
 ## 已知限制
 
 - PR 已在 GitCode 上实跑通过（克隆 → 分支 → 提交 → 推送 → 创建 PR）；GitHub 路径同构但未用真实令牌验证。
-- 工作流画布仍是编辑与模拟执行，节点还没真正派发 Agent（M4）。
+- 工作流只在 git 仓库里跑：并行隔离依赖 worktree，非 git 目录会被拒绝；合并冲突直接判运行失败，不做冲突解决 UI；结果分支不自动推送。
+- 工作流默认最多 2 次尝试（首跑 + 1 次重试），节点上的 `retries` 暂时只用作开关。
 - 克隆只支持 HTTPS + 令牌，SSH 密钥托管未做。
 - 命令以参数数组启动、不经过 shell，管道与重定向需要显式 `cmd /c` 或 `sh -c`。
 - 不做 rebase、submodule、LFS，也不提供 force push / `reset --hard`。
