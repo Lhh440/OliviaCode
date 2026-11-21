@@ -12,3 +12,7 @@ release/
 data/
 *.local
 apps/desktop/dist/
+
+# 本地临时产物（截图、探针脚本、解密出的临时令牌）
+.tmp/
+tmp-shots/
