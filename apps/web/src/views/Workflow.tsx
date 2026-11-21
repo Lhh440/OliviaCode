@@ -9,6 +9,7 @@ import {
   type NodeKind,
   type WfNode,
   type Workflow,
+  type RunPhase,
   type WorkflowRunEvent,
   type WorkflowRunState,
 } from '@olivia/core';
@@ -59,6 +60,7 @@ export function WorkflowView() {
   const [runInfo, setRunInfo] = useState<WorkflowRunState | null>(null);
   const [gate, setGate] = useState<GatePrompt | null>(null);
   const [panelOpen, setPanelOpen] = useState(true);
+  const [confirmReset, setConfirmReset] = useState(false);
   /** M6：已连接的 MCP 服务器，节点可以整台放行 */
   const [mcpServers, setMcpServers] = useState<string[]>([]);
 
@@ -84,6 +86,10 @@ export function WorkflowView() {
       // 画布变更同步给主进程调度器：触发器就是计划，别让两边各说各话
       void window.olivia?.schedules
         ?.sync({ workflow: wf, workspace })
+        .then((result) => {
+          // cron 不合法时在画布上就说清楚，别等用户到计划页才看到「无效」
+          if (result?.invalid?.length) setToast(result.invalid[0]!);
+        })
         .catch(() => undefined);
     }, 280);
     return () => clearTimeout(timer);
@@ -157,6 +163,26 @@ export function WorkflowView() {
       setGate({ nodeId: event.nodeId, title: event.title, detail: event.detail });
       setPanelOpen(true);
       setRunState('waiting');
+      return;
+    }
+    if (event.type === 'usage') {
+      setRunInfo((prev) =>
+        prev
+          ? {
+              ...prev,
+              usage: event.usage,
+              nodes: event.nodeId && prev.nodes[event.nodeId]
+                ? {
+                    ...prev.nodes,
+                    [event.nodeId]: {
+                      ...prev.nodes[event.nodeId]!,
+                      usage: event.nodeUsage ?? prev.nodes[event.nodeId]!.usage,
+                    },
+                  }
+                : prev.nodes,
+            }
+          : prev,
+      );
       return;
     }
     if (event.type === 'run.done') {
@@ -286,28 +312,71 @@ export function WorkflowView() {
 
   const advance = async (start: number) => {
     const order = topoOrder(wfRef.current);
-    for (let index = start; index < order.length; index += 1) {
-      const node = order[index];
-      if (!node || disposedRef.current) return;
-      if (node.kind === 'trigger') {
-        patchNode(node.id, { status: 'ready' });
-        continue;
+    /** 演示回放也要喂同一份运行面板：按钮在转，右栏总得能看出跑到哪一步 */
+    const markNode = (nodeId: string, phase: RunPhase): void => {
+      setRunInfo((prev) =>
+        prev
+          ? {
+              ...prev,
+              nodes: {
+                ...prev.nodes,
+                [nodeId]: {
+                  nodeId,
+                  title: wfRef.current.nodes.find((item) => item.id === nodeId)?.title,
+                  phase,
+                  attempts: 1,
+                },
+              },
+            }
+          : prev,
+      );
+    };
+    const log = (nodeId: string | undefined, text: string): void => {
+      setRunInfo((prev) =>
+        prev ? { ...prev, logs: [...prev.logs, { at: Date.now(), nodeId, kind: 'info', text }] } : prev,
+      );
+    };
+
+    try {
+      for (let index = start; index < order.length; index += 1) {
+        const node = order[index];
+        if (!node || disposedRef.current) return;
+        if (node.kind === 'trigger') {
+          patchNode(node.id, { status: 'ready' });
+          markNode(node.id, 'done');
+          continue;
+        }
+        if (node.kind === 'gate' && !approvedRef.current) {
+          patchNode(node.id, { status: 'waiting' });
+          markNode(node.id, 'waiting');
+          cursorRef.current = index;
+          setRunState('waiting');
+          setRunInfo((prev) => (prev ? { ...prev, phase: 'waiting' } : prev));
+          setGate({
+            nodeId: node.id,
+            title: node.title,
+            detail: node.blockReason ?? '合并前的人工确认：确认后继续执行。',
+          });
+          setToast('人工审批门：确认后继续执行');
+          return;
+        }
+        patchNode(node.id, { status: 'running' });
+        markNode(node.id, 'running');
+        log(node.id, `派发「${node.title}」`);
+        await sleep(720);
+        if (disposedRef.current) return;
+        patchNode(node.id, { status: 'done' });
+        markNode(node.id, 'done');
+        log(node.id, '完成');
       }
-      if (node.kind === 'gate' && !approvedRef.current) {
-        patchNode(node.id, { status: 'waiting' });
-        cursorRef.current = index;
-        setRunState('waiting');
-        setToast('人工审批门：确认后继续执行');
-        return;
-      }
-      patchNode(node.id, { status: 'running' });
-      await sleep(720);
       if (disposedRef.current) return;
-      patchNode(node.id, { status: 'done' });
+      setRunState('done');
+      setRunInfo((prev) => (prev ? { ...prev, phase: 'done', endedAt: Date.now() } : prev));
+      setToast(`跑完了：${order.length} 个节点（浏览器预览是模拟回放，不调用模型）`);
+    } finally {
+      // 中途抛错也不能把按钮永远留在「执行中…」
+      setRunState((previous) => (previous === 'running' ? 'idle' : previous));
     }
-    if (disposedRef.current) return;
-    setRunState('done');
-    setToast(`跑完了：${order.length} 个节点，产物已生成`);
   };
 
   const runReal = async (): Promise<boolean> => {
@@ -347,6 +416,7 @@ export function WorkflowView() {
       workflow: current,
       workspace,
       model: store.settings.model,
+      providerId: store.settings.providerId,
       allowShell: store.settings.allowShell,
       baseUrl: store.settings.baseUrl,
       apiKey: store.settings.apiKey,
@@ -363,11 +433,22 @@ export function WorkflowView() {
 
   const decideGate = (approved: boolean) => {
     const runId = runIdRef.current;
-    if (!runId || !gate) return;
-    window.olivia?.workflow.gate(runId, gate.nodeId, approved);
+    const bridge = window.olivia?.workflow;
+    if (bridge && runId && gate) {
+      bridge.gate(runId, gate.nodeId, approved);
+      setGate(null);
+      setRunState(approved ? 'running' : 'idle');
+      if (!approved) setToast('已停止：集成分支里已有的提交不会被删除');
+      return;
+    }
+    // 浏览器预览没有主进程：本地回放自己续跑，别让「批准」点下去没反应
+    if (approved) {
+      void approve();
+      return;
+    }
     setGate(null);
-    setRunState(approved ? 'running' : 'idle');
-    if (!approved) setToast('已停止：集成分支里已有的提交不会被删除');
+    setRunState('idle');
+    setToast('已停止本次模拟运行');
   };
 
   const cancelRun = () => {
@@ -386,6 +467,9 @@ export function WorkflowView() {
     }
     approvedRef.current = false;
     cursorRef.current = 0;
+    const current = wfRef.current;
+    const runId = `demo_${Date.now().toString(36)}`;
+    runIdRef.current = runId;
     setWf((prev) => ({
       ...prev,
       nodes: prev.nodes.map((node) => ({
@@ -393,6 +477,25 @@ export function WorkflowView() {
         status: node.kind === 'trigger' ? ('ready' as const) : ('idle' as const),
       })),
     }));
+    // 演示回放也开运行面板：否则「执行中…」时右栏什么都没有，看着像卡死
+    setRunInfo({
+      id: runId,
+      workflowId: current.id,
+      workflowName: current.name,
+      workspace: workspace || '浏览器预览',
+      phase: 'running',
+      startedAt: Date.now(),
+      nodes: {},
+      logs: [
+        {
+          at: Date.now(),
+          kind: 'info',
+          text: '浏览器预览：按拓扑顺序模拟推进，不调用模型、不写盘',
+        },
+      ],
+    });
+    setGate(null);
+    setPanelOpen(true);
     setRunState('running');
     setToast('浏览器预览：按拓扑顺序模拟推进');
     await sleep(120);
@@ -401,10 +504,12 @@ export function WorkflowView() {
 
   const approve = async () => {
     const order = topoOrder(wfRef.current);
-    const gate = order[cursorRef.current];
-    if (gate) patchNode(gate.id, { status: 'done' });
+    const gateNode = order[cursorRef.current];
+    if (gateNode) patchNode(gateNode.id, { status: 'done' });
     approvedRef.current = true;
+    setGate(null);
     setRunState('running');
+    setRunInfo((prev) => (prev ? { ...prev, phase: 'running' } : prev));
     setToast('已批准，继续执行');
     await advance(cursorRef.current + 1);
   };
@@ -442,11 +547,12 @@ export function WorkflowView() {
   };
 
   const reset = () => {
-    if (!window.confirm('重置为默认的「夜间重构工作流」？当前画布改动会丢失。')) return;
     const seeded = seedWorkflow();
     setWf(seeded);
     setSelectedId(seeded.nodes.find((node) => node.title === '页面与交互')?.id ?? null);
     setRunState('idle');
+    setRunInfo(null);
+    setConfirmReset(false);
     setToast('已重置为默认工作流');
   };
 
@@ -511,7 +617,7 @@ export function WorkflowView() {
           <button className="wf-action" onClick={() => fileRef.current?.click()}>
             导入
           </button>
-          <button className="wf-action" onClick={reset}>
+          <button className="wf-action" onClick={() => setConfirmReset(true)}>
             重置
           </button>
           <button
@@ -547,13 +653,44 @@ export function WorkflowView() {
         {runInfo && !panelOpen && (
           <button
             onClick={() => setPanelOpen(true)}
-            className="absolute left-4 bottom-16 z-30 h-8 px-3 rounded-xl border border-light-line dark:border-dark-line bg-light-panelStrong dark:bg-[rgba(18,14,20,0.94)] backdrop-blur-xl text-[11.5px] text-light-ink dark:text-dark-ink shadow-lg"
+            className="absolute left-4 bottom-16 z-30 h-8 px-3 rounded-xl border border-light-line dark:border-dark-line bg-light-panelStrong dark:bg-[rgba(18,14,20,0.94)] backdrop-blur-xl text-[13px] text-light-ink dark:text-dark-ink shadow-lg"
           >
             运行面板 · {runInfo.phase === 'running' ? '执行中' : runInfo.phase === 'done' ? '完成' : runInfo.phase}
           </button>
         )}
 
         {toast && <div className="toast">{toast}</div>}
+
+        {confirmReset && (
+          <div
+            className="fixed inset-0 z-[80] grid place-items-center bg-black/50 backdrop-blur-sm p-5"
+            onClick={() => setConfirmReset(false)}
+          >
+            <div
+              className="w-full max-w-sm rounded-2xl border border-light-line dark:border-dark-line bg-light-panel-light dark:bg-dark-panel p-5 shadow-2xl"
+              style={{ background: 'var(--olivia-panel, rgba(250,248,243,0.98))' }}
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+            >
+              <h2 className="text-[16px] font-semibold text-light-ink dark:text-dark-ink">
+                重置为默认工作流？
+              </h2>
+              <p className="mt-1.5 text-[13.5px] leading-relaxed text-light-inkMuted dark:text-dark-inkMuted">
+                当前画布上的节点、连线和触发器设置都会丢掉；已经生成的计划记录会保留（停用状态）。
+              </p>
+              <div className="mt-4 flex items-center gap-2">
+                <button className="btn-outline h-8 px-3" onClick={() => setConfirmReset(false)}>
+                  取消
+                </button>
+                <span className="flex-1" />
+                <button className="btn-solid h-8 px-3" onClick={reset}>
+                  重置
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <Inspector

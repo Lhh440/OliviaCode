@@ -1,9 +1,11 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { relativeTime } from '@olivia/core';
 import { Icon, Mark } from '../icons';
 import { navigate, type Route } from '../router';
 import { createTask, useStore } from '../store';
+import { isDemoTask } from '../seed';
+import { useProviders } from '../hooks/useProviders';
 import { useTheme } from '../hooks/useTheme';
 import { ThemePicker } from './theme/ThemePicker';
 import { loadWorkflow } from '../views/Workflow';
@@ -39,11 +41,18 @@ export function Sidebar({ route }: { route: Route }) {
   const { state, dispatch } = useStore();
   const { tasks, activeId, settings } = state;
   const { theme } = useTheme();
+  const { providers } = useProviders();
+  const connected = Boolean(settings.apiKey) || providers.some((provider) => provider.enabled && provider.hasKey);
   const activeTask = tasks.find((task) => task.id === activeId);
   const workspace = activeTask?.workspace;
   const workspaceName = workspace ? workspace.split(/[\\/]/).filter(Boolean).pop() : '本地工作区';
   // 侧栏的节点数与工作流页共用同一份草稿，不写死；只读一次，避免每次渲染都重新生成种子节点
   const workflowNodes = useMemo(() => loadWorkflow().nodes.length, []);
+  /** 首启动的示例任务单独分组：一眼能看出哪些是演示数据，还能一键清掉 */
+  const demoTasks = tasks.filter((task) => isDemoTask(task));
+  const realTasks = tasks.filter((task) => !isDemoTask(task));
+  const isMac = (window.olivia?.platform ?? navigator.userAgent).toLowerCase().includes('mac');
+  const newTaskKey = isMac ? '⌘N' : 'Ctrl+N';
 
   const onNewTask = () => {
     const task = createTask(settings);
@@ -54,8 +63,65 @@ export function Sidebar({ route }: { route: Route }) {
     });
   };
 
+  const clearDemo = () => {
+    for (const task of demoTasks) dispatch({ type: 'deleteTask', id: task.id });
+  };
+
+  // 快捷键要和按钮上写的一致：Ctrl/⌘ + N 新建任务
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      if ((event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'n') {
+        event.preventDefault();
+        onNewTask();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings]);
+
+  /** 任务行。示例任务额外挂一个 badge，避免看着像自己真跑过的记录。 */
+  const renderTask = (task: (typeof tasks)[number], demo = false) => {
+    const active = task.id === activeId;
+    return (
+      <button
+        key={task.id}
+        onClick={() => {
+          dispatch({ type: 'selectTask', id: task.id });
+          navigate('chat');
+        }}
+        title={`${STATUS_TITLE[task.status] ?? task.status} · ${task.title}`}
+        className={`relative w-full flex items-start gap-2 px-2.5 py-2 rounded-lg text-left transition-colors ${
+          active
+            ? 'bg-white/70 dark:bg-white/[0.07] shadow-sm'
+            : 'hover:bg-black/[0.035] dark:hover:bg-white/[0.045]'
+        }`}
+      >
+        {active && (
+          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-5 rounded-full bg-light-gold dark:bg-dark-gold" />
+        )}
+        <span className={`mt-[6px] w-1.5 h-1.5 shrink-0 rounded-full ${STATUS_DOT[task.status] ?? STATUS_DOT.idle}`} />
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-1.5">
+            <span className="block min-w-0 flex-1 text-[14px] leading-snug truncate text-light-ink dark:text-dark-ink">
+              {task.title}
+            </span>
+            {demo && (
+              <span className="shrink-0 text-[10.5px] px-1.5 py-[1px] rounded border border-light-line dark:border-dark-line text-light-inkFaint dark:text-dark-inkFaint">
+                示例
+              </span>
+            )}
+          </span>
+          <span className="block mt-0.5 text-[12px] text-light-inkFaint dark:text-dark-inkFaint">
+            {relativeTime(task.at)}
+          </span>
+        </span>
+      </button>
+    );
+  };
+
   return (
-    <aside className="w-[248px] shrink-0 h-full flex flex-col border-r border-light-gold/25 dark:border-dark-gold/15 bg-gradient-to-b from-light-bg/85 via-light-bg/72 to-light-bg/90 dark:from-black/55 dark:via-black/42 dark:to-black/60 backdrop-blur-2xl relative z-10 shadow-[inset_-1px_0_0_rgba(255,255,255,0.35)] dark:shadow-[inset_-1px_0_0_rgba(255,255,255,0.04)]">
+    <aside className="w-[var(--olivia-sidebar-w)] shrink-0 h-full flex flex-col border-r border-light-gold/25 dark:border-dark-gold/15 bg-gradient-to-b from-light-bg/85 via-light-bg/72 to-light-bg/90 dark:from-black/55 dark:via-black/42 dark:to-black/60 backdrop-blur-2xl relative z-10 shadow-[inset_-1px_0_0_rgba(255,255,255,0.35)] dark:shadow-[inset_-1px_0_0_rgba(255,255,255,0.04)]">
       <div className="h-[2px] shrink-0 rule-ornate opacity-80" />
       {/* —— 品牌 —— */}
       <div className="px-4 pt-4 pb-3">
@@ -72,11 +138,11 @@ export function Sidebar({ route }: { route: Route }) {
             <Mark size={20} />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block font-serif text-[15px] font-semibold leading-tight tracking-tight text-light-ink dark:text-dark-ink">
+            <span className="block font-serif text-[17px] font-semibold leading-tight tracking-tight text-light-ink dark:text-dark-ink">
               OliviaCode
             </span>
-            <span className="block text-[10px] tracking-[0.14em] uppercase text-light-inkFaint dark:text-dark-inkFaint">
-              {theme.name} · 0.8
+            <span className="block text-[11px] tracking-[0.14em] uppercase text-light-inkFaint dark:text-dark-inkFaint">
+              {theme.name} · 0.10
             </span>
           </span>
           <ThemePicker />
@@ -89,7 +155,7 @@ export function Sidebar({ route }: { route: Route }) {
           onClick={onNewTask}
           whileHover={{ y: -1 }}
           whileTap={{ scale: 0.985 }}
-          className="group relative w-full flex items-center gap-2 h-9 px-3 rounded-xl overflow-hidden text-white text-[12.5px] font-medium shadow-md transition-all"
+          className="group relative w-full flex items-center gap-2 h-9 px-3 rounded-xl overflow-hidden text-[color:var(--olivia-on-accent)] text-[14px] font-medium shadow-md transition-all"
           style={{
             background: 'var(--olivia-accent)',
             boxShadow: '0 6px 16px -8px color-mix(in srgb, var(--olivia-accent) 70%, transparent)',
@@ -99,7 +165,7 @@ export function Sidebar({ route }: { route: Route }) {
           <span className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-r from-white/0 via-white/25 to-white/0 animate-sheen" />
           <Icon name="plus" size={14} />
           <span>新建任务</span>
-          <span className="ml-auto text-[10.5px] opacity-70 font-normal">⌘N</span>
+          <span className="ml-auto text-[12px] opacity-70 font-normal">{newTaskKey}</span>
         </motion.button>
       </div>
 
@@ -111,7 +177,7 @@ export function Sidebar({ route }: { route: Route }) {
             <button
               key={item.id}
               onClick={() => navigate(item.id)}
-              className={`relative w-full flex items-center gap-2.5 h-8 px-2.5 rounded-lg text-[12.5px] transition-colors ${
+              className={`relative w-full flex items-center gap-2.5 h-8 px-2.5 rounded-lg text-[14px] transition-colors ${
                 active
                   ? 'text-light-ink dark:text-dark-ink font-medium bg-white/85 dark:bg-white/[0.09] shadow-sm border border-light-line/70 dark:border-dark-line/70'
                   : 'text-light-inkMuted dark:text-dark-inkMuted border border-transparent hover:text-light-ink dark:hover:text-dark-ink hover:bg-black/[0.04] dark:hover:bg-white/[0.05]'
@@ -120,12 +186,15 @@ export function Sidebar({ route }: { route: Route }) {
               <Icon name={item.icon} size={14} className="relative shrink-0" />
               <span className="relative flex-1 text-left">{item.label}</span>
               {item.id === 'chat' && tasks.length > 0 && (
-                <span className="relative text-[10.5px] tabular-nums text-light-inkFaint dark:text-dark-inkFaint">
+                <span className="relative text-[12px] tabular-nums text-light-inkFaint dark:text-dark-inkFaint">
                   {tasks.length}
                 </span>
               )}
               {item.id === 'workflow' && (
-                <span className="relative text-[10.5px] tabular-nums text-light-inkFaint dark:text-dark-inkFaint">
+                <span
+                  className="relative text-[12px] tabular-nums text-light-inkFaint dark:text-dark-inkFaint"
+                  title="当前画布上的节点数（工作流只有一张画布，不是工作流条数）"
+                >
                   {workflowNodes}
                 </span>
               )}
@@ -142,39 +211,30 @@ export function Sidebar({ route }: { route: Route }) {
           <span className="eyebrow !text-light-inkFaint dark:!text-dark-inkFaint">最近任务</span>
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto pr-0.5 space-y-0.5">
-          {tasks.map((task) => {
-            const active = task.id === activeId;
-            return (
-              <button
-                key={task.id}
-                onClick={() => {
-                  dispatch({ type: 'selectTask', id: task.id });
-                  navigate('chat');
-                }}
-                title={`${STATUS_TITLE[task.status] ?? task.status} · ${task.title}`}
-                className={`relative w-full flex items-start gap-2 px-2.5 py-2 rounded-lg text-left transition-colors ${
-                  active
-                    ? 'bg-white/70 dark:bg-white/[0.07] shadow-sm'
-                    : 'hover:bg-black/[0.035] dark:hover:bg-white/[0.045]'
-                }`}
-              >
-                {active && (
-                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-5 rounded-full bg-light-gold dark:bg-dark-gold" />
-                )}
-                <span className={`mt-[6px] w-1.5 h-1.5 shrink-0 rounded-full ${STATUS_DOT[task.status] ?? STATUS_DOT.idle}`} />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[12.5px] leading-snug truncate text-light-ink dark:text-dark-ink">
-                    {task.title}
-                  </span>
-                  <span className="block mt-0.5 text-[10.5px] text-light-inkFaint dark:text-dark-inkFaint">
-                    {relativeTime(task.at)}
-                  </span>
+          {realTasks.map((task) => renderTask(task))}
+
+          {demoTasks.length > 0 && (
+            <div className="pt-2">
+              <div className="flex items-center gap-1.5 px-2 pb-1">
+                <span className="text-[11px] tracking-[0.1em] uppercase text-light-inkFaint dark:text-dark-inkFaint">
+                  示例 · 演示数据
                 </span>
-              </button>
-            );
-          })}
+                <span className="flex-1" />
+                <button
+                  type="button"
+                  onClick={clearDemo}
+                  className="text-[11.5px] text-light-inkFaint dark:text-dark-inkFaint hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                  title="删掉这些演示任务（只清本地记录）"
+                >
+                  一键清空
+                </button>
+              </div>
+              {demoTasks.map((task) => renderTask(task, true))}
+            </div>
+          )}
+
           {tasks.length === 0 && (
-            <p className="px-2.5 py-6 text-center text-[11.5px] text-light-inkFaint dark:text-dark-inkFaint">
+            <p className="px-2.5 py-6 text-center text-[13px] text-light-inkFaint dark:text-dark-inkFaint">
               还没有任务
             </p>
           )}
@@ -189,27 +249,27 @@ export function Sidebar({ route }: { route: Route }) {
           title={workspace ?? '当前任务还没有绑定工作区'}
         >
           <Icon name="folder" size={12} className="shrink-0 text-light-accent dark:text-dark-gold" />
-          <span className="min-w-0 flex-1 text-[11.5px] truncate text-light-ink dark:text-dark-ink">
+          <span className="min-w-0 flex-1 text-[13px] truncate text-light-ink dark:text-dark-ink">
             {workspaceName}
           </span>
           {!workspace && (
-            <span className="shrink-0 text-[10px] text-amber-600 dark:text-amber-400">未绑定</span>
+            <span className="shrink-0 text-[11px] text-amber-600 dark:text-amber-400">未绑定</span>
           )}
         </button>
 
-        <div className="flex items-center justify-between px-1 text-[10.5px]">
-          {settings.apiKey ? (
+        <div className="flex items-center justify-between px-1 text-[12px]">
+          {connected ? (
             <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               已连接
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1.5 text-light-inkFaint dark:text-dark-inkFaint">
+            <span className="inline-flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
               <Icon name="sparkle" size={10} />
-              演示模式
+              演示模式 · 未接入模型
             </span>
           )}
-          <span className="text-light-inkFaint dark:text-dark-inkFaint">M2–M7 · 动态主题</span>
+          <span className="text-light-inkFaint dark:text-dark-inkFaint">v0.10.0</span>
         </div>
       </div>
     </aside>

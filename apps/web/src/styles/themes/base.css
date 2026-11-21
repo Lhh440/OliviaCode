@@ -4,12 +4,63 @@
 
 @layer base {
   :root {
-    --olivia-bg: #070c11;
-    --olivia-ink: #e6eef3;
-    --olivia-accent: #6ea6c9;
-    --olivia-accent-rgb: 110,166,201;
-    --olivia-gold: #c9b48a;
-    --olivia-scrim: 7, 13, 19;
+    /* 字体：Inter（拉丁）在前，汉字交给 HarmonyOS Sans SC。
+       这里同时暴露成 CSS 变量，给 extensions.css / schedules.css 里
+       `var(--font-serif, ...)` 这类写法兜底。 */
+    --font-sans: theme('fontFamily.sans');
+    --font-serif: theme('fontFamily.serif');
+    --font-mono: theme('fontFamily.mono');
+
+    /* 侧栏宽度：Sidebar 的宽度与 KoiScene 阅读带的左缘共用这一个值，
+       以前两个文件各写一份 272，改一边就错位。 */
+    --olivia-sidebar-w: 272px;
+
+    /* 黑鱼白水：纸白的水、墨黑的鱼。JS 跑起来后会按主题覆盖这一组变量 */
+    --olivia-bg: #f2f1ec;
+    --olivia-ink: #14161a;
+    --olivia-ink-muted: #565a61;
+    --olivia-ink-faint: #83868d;
+    --olivia-accent: #14161a;
+    --olivia-accent-rgb: 20,22,26;
+    --olivia-accent-strong: #2b2e34;
+    --olivia-on-accent: #fbfaf6;
+    --olivia-gold: #a07850;
+    --olivia-line: #dedcd5;
+    --olivia-line-strong: #c8c5bc;
+    --olivia-panel: rgba(252, 251, 247, 0.72);
+    --olivia-panel-strong: rgba(255, 254, 250, 0.95);
+    /* 消息里的卡片（工具卡 / diff / 提案）与页头：纸比面板更实一点，
+       鱼从卡片背后透过来时不能把字搅浑 */
+    --olivia-card: rgba(253, 252, 248, 0.84);
+    --olivia-card-strong: rgba(255, 254, 250, 0.93);
+    --olivia-head: rgba(246, 245, 240, 0.7);
+    --olivia-water: #fbfaf6;
+    --olivia-fish: #14161a;
+    --olivia-scrim: 232, 230, 222;
+    color-scheme: light;
+  }
+
+  :root.dark {
+    /* 白鱼黑水：夜水、骨白的鱼 */
+    --olivia-bg: #08090a;
+    --olivia-ink: #f2f1ec;
+    --olivia-ink-muted: #a5a6a4;
+    --olivia-ink-faint: #7a7c80;
+    --olivia-accent: #f2f1ec;
+    --olivia-accent-rgb: 242,241,236;
+    --olivia-accent-strong: #d8d7d0;
+    --olivia-on-accent: #0a0b0c;
+    --olivia-gold: #c9a887;
+    --olivia-line: #232529;
+    --olivia-line-strong: #33363b;
+    --olivia-panel: rgba(12, 13, 15, 0.74);
+    --olivia-panel-strong: rgba(15, 16, 18, 0.94);
+    --olivia-card: rgba(14, 15, 17, 0.82);
+    --olivia-card-strong: rgba(16, 17, 19, 0.92);
+    --olivia-head: rgba(6, 7, 8, 0.72);
+    --olivia-water: #121417;
+    --olivia-fish: #f2f1ec;
+    --olivia-scrim: 5, 6, 7;
     color-scheme: dark;
   }
 
@@ -29,10 +80,15 @@
     background: var(--olivia-bg);
     color: var(--olivia-ink);
     font-family: theme('fontFamily.sans');
-    font-size: 13.5px;
+    font-size: 15px;
     line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
-    text-rendering: optimizeLegibility;
+    /* 600 已经绑到 HarmonyOS Sans SC Medium，700 再往上让它直接停在 Medium：
+       宁可少一档粗，也不要浏览器合成的假粗体 */
+    font-synthesis-weight: none;
+    font-feature-settings: 'kern' 1;
+    /* Windows 上 antialiased 会关掉次像素渲染，反而发虚；正文走系统默认渲染 */
+    -webkit-font-smoothing: auto;
+    text-rendering: auto;
     overflow: hidden;
     transition: background-color 0.6s ease, color 0.6s ease;
   }
@@ -41,13 +97,8 @@
     background: rgba(var(--olivia-accent-rgb), 0.32);
   }
 
-  /* 古典衬线标题 */
-  h1,
-  h2,
-  h3 {
-    font-family: theme('fontFamily.serif');
-    letter-spacing: -0.01em;
-  }
+  /* 标题不再单独换衬线体：品牌名、留白页大标题和正文共用 Inter + HarmonyOS Sans，
+     靠字号、字距与墨色渐变（.text-plate）分层 */
 
   ::-webkit-scrollbar {
     width: 9px;
@@ -101,13 +152,19 @@
 @layer components {
   /* 小字距标签 */
   .eyebrow {
-    @apply text-[9.5px] font-medium uppercase tracking-[0.22em];
+    @apply text-[10.5px] font-medium uppercase tracking-[0.22em];
     color: var(--olivia-gold);
   }
 
-  /* 标题：蚀刻金属（亮）/ 镀铬（暗） */
+  /* 标题：像墨在纸上洇开——浅色从近黑经暖赭回到近黑，深色反过来 */
   .text-plate {
-    background-image: linear-gradient(176deg, #10131c 0%, var(--olivia-accent) 58%, #10131c 100%);
+    background-image: linear-gradient(
+      176deg,
+      #0f1114 0%,
+      #2f333a 34%,
+      var(--olivia-gold) 58%,
+      #1b1e23 100%
+    );
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
@@ -116,11 +173,11 @@
   .dark .text-plate {
     background-image: linear-gradient(
       176deg,
-      #fff4e6 0%,
-      #efb9b2 30%,
-      var(--olivia-accent) 54%,
-      var(--olivia-gold) 76%,
-      #fff2da 100%
+      #fbfaf6 0%,
+      #cfcec7 32%,
+      var(--olivia-gold) 56%,
+      #e6e5de 78%,
+      #fbfaf6 100%
     );
     -webkit-background-clip: text;
     background-clip: text;
@@ -129,9 +186,9 @@
 
   /* 按钮 */
   .btn-solid {
-    @apply inline-flex items-center gap-1.5 h-7 px-3 rounded-lg text-[12px] font-medium;
-    @apply text-white;
+    @apply inline-flex items-center gap-1.5 h-7 px-3 rounded-lg text-[13.5px] font-medium;
     @apply shadow-sm hover:brightness-110 active:scale-[0.98];
+    color: var(--olivia-on-accent);
     @apply transition-all duration-200;
     background: var(--olivia-accent);
   }
@@ -141,7 +198,7 @@
   }
 
   .btn-outline {
-    @apply inline-flex items-center gap-1.5 h-7 px-3 rounded-lg text-[12px] font-medium;
+    @apply inline-flex items-center gap-1.5 h-7 px-3 rounded-lg text-[13.5px] font-medium;
     @apply border border-light-lineStrong dark:border-dark-lineStrong;
     @apply bg-white/60 dark:bg-white/[0.06] backdrop-blur-sm;
     @apply text-light-ink dark:text-dark-ink;
@@ -150,7 +207,7 @@
   }
 
   .btn-ghost {
-    @apply inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[12px] font-medium;
+    @apply inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[13.5px] font-medium;
     @apply text-light-inkMuted dark:text-dark-inkMuted;
     @apply hover:bg-black/[0.05] dark:hover:bg-white/[0.07];
     @apply hover:text-light-ink dark:hover:text-dark-ink;
@@ -178,7 +235,7 @@
 
   /* 输入 */
   .field-input {
-    @apply w-full h-9 px-3 rounded-lg text-[13px];
+    @apply w-full h-9 px-3 rounded-lg text-[14.5px];
     @apply border border-light-line dark:border-dark-line;
     @apply bg-white/70 dark:bg-white/[0.05];
     @apply text-light-ink dark:text-dark-ink;
@@ -199,7 +256,7 @@
 
   /* Markdown 排版 */
   .prose-olivia {
-    @apply text-[13.5px] leading-[1.72] text-light-ink dark:text-dark-ink;
+    @apply text-[15px] leading-[1.72] text-light-ink dark:text-dark-ink;
   }
 
   .prose-olivia > * + * {
@@ -214,15 +271,15 @@
   }
 
   .prose-olivia h1 {
-    @apply text-[18px];
+    @apply text-[20px];
   }
 
   .prose-olivia h2 {
-    @apply text-[16px];
+    @apply text-[18px];
   }
 
   .prose-olivia h3 {
-    @apply text-[14px];
+    @apply text-[15.5px];
   }
 
   .prose-olivia p {
@@ -242,13 +299,13 @@
   }
 
   .prose-olivia code {
-    @apply font-mono text-[12px] px-1.5 py-0.5 rounded;
+    @apply font-mono text-[13.5px] px-1.5 py-0.5 rounded;
     @apply bg-light-accent/[0.09] dark:bg-dark-gold/[0.12];
     @apply text-light-accent dark:text-dark-gold;
   }
 
   .prose-olivia pre {
-    @apply p-3 rounded-xl overflow-x-auto text-[12px] font-mono leading-relaxed;
+    @apply p-3 rounded-xl overflow-x-auto text-[13.5px] font-mono leading-relaxed;
     @apply bg-black/[0.045] dark:bg-black/45;
     @apply border border-light-line dark:border-dark-line;
   }
@@ -287,7 +344,7 @@
   }
 
   .md-p {
-    font-size: 13.5px;
+    font-size: 15px;
     line-height: 1.72;
     color: var(--olivia-ink);
   }
@@ -308,20 +365,20 @@
   /* 标题级别用属性选择器：Markdown 里的类名是拼出来的（md-h + level），
      Tailwind 的内容扫描只认识字面量，拼出来的类会被 purge 掉。 */
   .md .md-h[data-level='1'] {
-    font-size: 17px;
+    font-size: 19px;
   }
 
   .md .md-h[data-level='2'] {
-    font-size: 15.5px;
+    font-size: 17.5px;
   }
 
   .md .md-h[data-level='3'] {
-    font-size: 14px;
+    font-size: 15.5px;
   }
 
   .md-list {
     padding-left: 1.25rem;
-    font-size: 13.5px;
+    font-size: 15px;
     line-height: 1.7;
     color: var(--olivia-ink);
   }
@@ -349,7 +406,7 @@
     padding: 0.1em 0.4em;
     border-radius: 5px;
     font-family: theme('fontFamily.mono');
-    font-size: 12px;
+    font-size: 13.5px;
     color: var(--olivia-accent);
     background: color-mix(in srgb, var(--olivia-accent) 9%, transparent);
   }
@@ -374,7 +431,7 @@
     padding: 6px 12px;
     border-bottom: 1px solid color-mix(in srgb, var(--olivia-ink) 9%, transparent);
     font-family: theme('fontFamily.mono');
-    font-size: 10.5px;
+    font-size: 12px;
     letter-spacing: 0.04em;
     text-transform: uppercase;
     opacity: 0.66;
@@ -386,7 +443,7 @@
     gap: 4px;
     border-radius: 6px;
     padding: 2px 6px;
-    font-size: 10.5px;
+    font-size: 12px;
     opacity: 0.8;
     transition: background 0.15s ease, opacity 0.15s ease;
   }
@@ -401,7 +458,7 @@
     padding: 12px;
     overflow-x: auto;
     font-family: theme('fontFamily.mono');
-    font-size: 12px;
+    font-size: 13.5px;
     line-height: 1.65;
     color: var(--olivia-ink);
   }
@@ -410,6 +467,33 @@
     color: var(--olivia-accent);
     text-decoration: underline;
     text-underline-offset: 2px;
+  }
+
+  /* —— AI 输出的整块淡入（.md-stream 挂在流式回合的分片容器上）——
+     animation 只在元素挂载时跑一遍：新出现的段落/列表项/工具卡整体浮现，
+     已经在场的内容不会被重新打扰。配合 store.tsx 的 createTextCoalescer
+     （把 delta 攒成整句再上屏），正文按块出现，不再逐字往外爬。 */
+  .md-stream > *,
+  .md-stream .md > * {
+    animation: olivia-block-in 0.26s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+}
+
+@keyframes olivia-block-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .md-stream > *,
+  .md-stream .md > * {
+    animation: none;
   }
 }
 
@@ -432,35 +516,35 @@
 }
 
 /* —— 主题强调色覆盖 ——
-   Tailwind 的 dark-accent / dark-gold 是编译期常量，这里用主题变量覆盖最常见的原子类，
-   让按钮、图标、选中态真的跟着主题走（含半透明底色）。 */
-.dark .text-dark-accent,
-.dark .text-light-accent {
+   Tailwind 的 light/dark-accent / gold 是编译期常量，这里统一接到主题变量上，
+   两种明暗都生效：按钮、图标、选中态真的跟着主题走。 */
+.text-dark-accent,
+.text-light-accent {
   color: var(--olivia-accent);
 }
 
-.dark .bg-dark-accent,
-.dark .bg-light-accent {
+.bg-dark-accent,
+.bg-light-accent {
   background-color: var(--olivia-accent);
 }
 
-.dark .border-dark-accent,
-.dark .border-light-accent {
+.border-dark-accent,
+.border-light-accent {
   border-color: var(--olivia-accent);
 }
 
-.dark .text-dark-gold,
-.dark .text-light-gold {
+.text-dark-gold,
+.text-light-gold {
   color: var(--olivia-gold);
 }
 
-.dark .bg-dark-gold,
-.dark .bg-light-gold {
+.bg-dark-gold,
+.bg-light-gold {
   background-color: var(--olivia-gold);
 }
 
-.dark .border-dark-gold,
-.dark .border-light-gold {
+.border-dark-gold,
+.border-light-gold {
   border-color: var(--olivia-gold);
 }
 
@@ -480,7 +564,56 @@
   color: color-mix(in srgb, var(--olivia-accent) 70%, transparent);
 }
 
-/* 暗色玻璃 UI 统一底：主题只换背景与强调色，不换表面材质 */
+/* 表面材质：两种明暗共用同一套玻璃结构，只换颜色 */
+:root {
+  --olivia-surface: rgba(252, 251, 247, 0.72);
+}
+
 :root.dark {
-  --olivia-surface: rgba(12, 17, 22, 0.72);
+  --olivia-surface: rgba(13, 14, 16, 0.72);
+}
+
+/* —— 「鱼腹」气泡：用户消息 = 这套主题的鱼色 ——
+   浅色主题里是墨黑（黑鱼），深色主题里是骨白（白鱼），
+   气泡里的 Markdown 全部继承当前文字色，不再吃全局 ink。 */
+.bubble-fish .prose-olivia,
+.bubble-fish .prose-olivia :where(p, li, strong, em, h1, h2, h3, h4, td, th),
+.bubble-fish .md-p,
+.bubble-fish .md-h,
+.bubble-fish .md-list,
+.bubble-fish .md-list li {
+  color: inherit;
+}
+
+.bubble-fish .prose-olivia a,
+.bubble-fish .md a {
+  color: inherit;
+  text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+}
+
+.bubble-fish .prose-olivia code,
+.bubble-fish .md-code {
+  color: inherit;
+  background: color-mix(in srgb, currentColor 13%, transparent);
+}
+
+.bubble-fish .prose-olivia pre,
+.bubble-fish .md-pre {
+  color: inherit;
+  background: color-mix(in srgb, currentColor 9%, transparent);
+  border-color: color-mix(in srgb, currentColor 20%, transparent);
+}
+
+.bubble-fish .md-quote {
+  color: inherit;
+  border-color: color-mix(in srgb, currentColor 38%, transparent);
+}
+
+.bubble-fish .md-hr {
+  background: color-mix(in srgb, currentColor 28%, transparent);
+}
+
+.bubble-fish .md-pre-head {
+  color: inherit;
+  border-color: color-mix(in srgb, currentColor 16%, transparent);
 }

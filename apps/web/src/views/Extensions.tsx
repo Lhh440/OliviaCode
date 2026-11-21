@@ -309,10 +309,13 @@ export function ExtensionsView() {
                 <textarea
                   className="input textarea"
                   rows={2}
-                  placeholder={'-y\n@modelcontextprotocol/server-filesystem\nD:\\work'}
+                  placeholder={'-y\n@modelcontextprotocol/server-filesystem\n<工作区绝对路径>'}
                   value={draft.argsText}
                   onChange={(e) => setDraft({ ...draft, argsText: e.target.value })}
                 />
+                <span className="ext-hint">
+                  路径用你自己的目录；不知道怎么填就先绑定工作区，再把它粘过来。
+                </span>
               </label>
             </div>
           ) : (

@@ -8,6 +8,22 @@ export interface TextDiff {
 
 const MAX_LINES = 1500;
 
+/**
+ * 统一 diff 头：`@@ -旧起点,旧行数 +新起点,新行数 @@`。
+ * 行数为 0（纯新增/纯删除）时按 git 惯例写「前一行行号,0」，
+ * 新文件因此是 `@@ -0,0 +1,N @@`，而不是看起来自相矛盾的 `@@ -1,0 +1,N @@`。
+ */
+export function formatHunkHeader(
+  oldStart: number,
+  oldCount: number,
+  newStart: number,
+  newCount: number,
+): string {
+  const at = (start: number, count: number): string =>
+    count === 0 ? `${Math.max(0, start - 1)},0` : `${start},${count}`;
+  return `@@ -${at(oldStart, oldCount)} +${at(newStart, newCount)} @@`;
+}
+
 function split(text: string): string[] {
   if (text === '') return [];
   return text.replace(/\r\n/g, '\n').split('\n');
@@ -33,7 +49,7 @@ export function diffText(before: string, after: string, context = 3): TextDiff {
     return {
       adds: b.length,
       dels: a.length,
-      hunks: [{ header: `@@ -1,${a.length} +1,${b.length} @@`, lines }],
+      hunks: [{ header: formatHunkHeader(1, a.length, 1, b.length), lines }],
     };
   }
 
@@ -95,8 +111,10 @@ export function diffText(before: string, after: string, context = 3): TextDiff {
     }
     const slice = ops.slice(start, Math.min(end + context, ops.length));
     const anchor = slice[0]!;
+    const oldCount = slice.filter((op) => op.kind !== 'add').length;
+    const newCount = slice.filter((op) => op.kind !== 'del').length;
     hunks.push({
-      header: `@@ -${anchor.aLine},${slice.filter((op) => op.kind !== 'add').length} +${anchor.bLine},${slice.filter((op) => op.kind !== 'del').length} @@`,
+      header: formatHunkHeader(anchor.aLine, oldCount, anchor.bLine, newCount),
       lines: slice.map((op) => ({ kind: op.kind, text: op.text })),
     });
     index = Math.min(end + context, ops.length);

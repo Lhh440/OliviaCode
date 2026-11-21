@@ -134,7 +134,8 @@ export function seedWorkflow(): Workflow {
     kind: 'trigger',
     title: '每晚 22:00',
     subtitle: '触发器',
-    schedule: '每晚 22:00',
+    // 画布上的触发器直接映射成计划记录，这里必须是能过校验器的标准 5 段 cron
+    schedule: '0 22 * * *',
     status: 'ready',
     x: 40,
     y: 330,
@@ -184,7 +185,7 @@ export function seedWorkflow(): Workflow {
     kind: 'reviewer',
     title: '独立评审',
     subtitle: 'Reviewer · 干净上下文',
-    model: 'qwen3.8-27b',
+    model: 'qwen3-14b',
     tools: ['read', 'git'],
     context: 'clean',
     prompt: '只看 diff 与仓库现状，找出正确性、安全性与可维护性问题。不要相信实现者的自述。',
@@ -263,6 +264,12 @@ export interface Viewport {
   s: number;
 }
 
+/**
+ * 适配视图：整张图塞进视口，但缩小有下限。
+ * 51% 时节点标题已经认不出来，所以下限抬到 75%，超出部分靠拖动画布看。
+ */
+const MIN_FIT_SCALE = 0.75;
+
 export function fitView(
   nodes: WfNode[],
   width: number,
@@ -279,7 +286,7 @@ export function fitView(
   const bh = maxY - minY;
   const s = Math.min(
     maxScale,
-    Math.max(0.3, Math.min((width - pad * 2) / bw, (height - pad * 2) / bh)),
+    Math.max(MIN_FIT_SCALE, Math.min((width - pad * 2) / bw, (height - pad * 2) / bh)),
   );
   return {
     s,

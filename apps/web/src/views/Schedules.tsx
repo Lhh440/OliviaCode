@@ -90,8 +90,10 @@ export function SchedulesView() {
     const api = window.olivia?.schedules;
     if (!api) return;
     const result = await api.sync({ workflow: loadWorkflow(), workspace }).catch(() => null);
-    if (result && !result.ok) setNotice(result.error ?? '同步失败');
-    else if (result?.created?.length) setNotice(`新增计划：${result.created.join('、')}`);
+    if (!result) return;
+    if (!result.ok) setNotice(result.error ?? '同步失败');
+    else if (result.invalid?.length) setNotice(result.invalid.join('；'));
+    else if (result.created?.length) setNotice(`新增计划：${result.created.join('、')}`);
   }, [workspace]);
 
   useEffect(() => {
@@ -395,6 +397,30 @@ export function SchedulesView() {
                       onChange={(event) => setPolicy({ ...policy, maxSteps: Number(event.target.value) })}
                     />
                   </label>
+                  <label className="sch-field">
+                    <span>token 上限（输入+输出）</span>
+                    <input
+                      className="input"
+                      type="number"
+                      min={1000}
+                      max={100000000}
+                      step={1000}
+                      value={policy.maxTokens ?? 1000000}
+                      onChange={(event) => setPolicy({ ...policy, maxTokens: Number(event.target.value) })}
+                    />
+                  </label>
+                  <label className="sch-field">
+                    <span>参考费用上限（美元，0 = 不设）</span>
+                    <input
+                      className="input"
+                      type="number"
+                      min={0}
+                      max={10000}
+                      step={0.1}
+                      value={policy.maxCost ?? 0}
+                      onChange={(event) => setPolicy({ ...policy, maxCost: Number(event.target.value) })}
+                    />
+                  </label>
                 </div>
                 <div className="sch-field">
                   <span>允许的 MCP 服务器（无人值守）</span>
@@ -444,6 +470,16 @@ export function SchedulesView() {
                         {RUN_STATUS_LABEL[run.status]}
                       </span>
                       <span className="sch-run-dur">{duration(run.startedAt, run.endedAt)}</span>
+                      {run.usage && run.usage.steps > 0 && (
+                        <span
+                          className="sch-run-dur"
+                          title={`输入 ${run.usage.input} · 输出 ${run.usage.output}${
+                            run.usage.costUsd !== undefined ? ` · 参考费用 $${run.usage.costUsd.toFixed(4)}` : ''
+                          }`}
+                        >
+                          {Math.round((run.usage.input + run.usage.output) / 1000)}k tok
+                        </span>
+                      )}
                       {run.missed ? <span className="sch-run-missed">错过 {run.missed}</span> : null}
                       {run.reportPath && (
                         <button className="link-btn" onClick={() => void openReport(run)}>

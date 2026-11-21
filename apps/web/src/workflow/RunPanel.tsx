@@ -7,6 +7,7 @@ import {
   type Workflow,
 } from '@olivia/core';
 import { Icon } from '../icons';
+import { UsageBadge } from '../components/UsageBadge';
 
 export interface GatePrompt {
   nodeId: string;
@@ -68,15 +69,15 @@ export function RunPanel({
       className="wf-runpanel absolute left-4 bottom-16 z-30 w-[430px] max-w-[calc(100%-2rem)] rounded-2xl border border-light-line dark:border-dark-line bg-light-panelStrong dark:bg-[rgba(18,14,20,0.94)] backdrop-blur-2xl shadow-2xl overflow-hidden"
     >
       <header className="flex items-center gap-2 px-3.5 py-2.5 border-b border-light-line dark:border-dark-line">
-        <span className="text-[11px] font-medium text-light-ink dark:text-dark-ink truncate">
+        <span className="text-[12.5px] font-medium text-light-ink dark:text-dark-ink truncate">
           {run.workflowName}
         </span>
         <span
-          className={`text-[10px] px-1.5 py-0.5 rounded border ${PHASE_STYLE[run.phase] ?? PHASE_STYLE.canceled}`}
+          className={`text-[11px] px-1.5 py-0.5 rounded border ${PHASE_STYLE[run.phase] ?? PHASE_STYLE.canceled}`}
         >
           {RUN_PHASE_LABEL[run.phase]}
         </span>
-        <span className="ml-auto text-[10.5px] text-light-inkFaint dark:text-dark-inkFaint tabular-nums">
+        <span className="ml-auto text-[12px] text-light-inkFaint dark:text-dark-inkFaint tabular-nums">
           {finished}/{nodes.length} · {active} 并行
         </span>
         <button
@@ -88,14 +89,29 @@ export function RunPanel({
         </button>
       </header>
 
+      {run.usage && run.usage.steps > 0 && (
+        <div className="px-3.5 py-1.5 border-b border-light-line dark:border-dark-line">
+          <UsageBadge usage={run.usage} />
+        </div>
+      )}
+
       <div className="px-3.5 py-2 flex flex-wrap gap-1.5 border-b border-light-line dark:border-dark-line">
         {nodes.map(({ node, state: nodeState }) => (
           <span
             key={node.id}
-            className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border ${
+            className={`inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded border ${
               PHASE_STYLE[nodeState.phase] ?? PHASE_STYLE.canceled
             } ${nodeState.phase === 'queued' ? 'opacity-55' : ''}`}
-            title={nodeState.error ?? nodeState.summary ?? node.title}
+            title={
+              [
+                nodeState.error ?? nodeState.summary,
+                nodeState.usage && nodeState.usage.steps > 0
+                  ? `输入 ${nodeState.usage.input} · 输出 ${nodeState.usage.output}`
+                  : '',
+              ]
+                .filter(Boolean)
+                .join(' · ') || node.title
+            }
           >
             <span
               className={`w-1.5 h-1.5 rounded-full ${
@@ -117,14 +133,14 @@ export function RunPanel({
 
       <div ref={logRef} className="px-3.5 py-2 max-h-[124px] overflow-y-auto space-y-1">
         {logs.length === 0 ? (
-          <p className="text-[11px] text-light-inkFaint dark:text-dark-inkFaint">正在派发节点…</p>
+          <p className="text-[12.5px] text-light-inkFaint dark:text-dark-inkFaint">正在派发节点…</p>
         ) : (
           logs.map((line, index) => {
             const node = line.nodeId ? workflow.nodes.find((item) => item.id === line.nodeId) : null;
             return (
               <p
                 key={`${line.at}-${index}`}
-                className={`text-[10.5px] leading-relaxed font-mono break-words ${LOG_STYLE[line.kind] ?? LOG_STYLE.info}`}
+                className={`text-[12px] leading-relaxed font-mono break-words ${LOG_STYLE[line.kind] ?? LOG_STYLE.info}`}
               >
                 {node ? <span className="text-light-inkFaint dark:text-dark-inkFaint">[{node.title}] </span> : null}
                 {line.text}
@@ -142,18 +158,18 @@ export function RunPanel({
             exit={{ height: 0, opacity: 0 }}
             className="px-3.5 py-2.5 border-t border-amber-500/25 bg-amber-500/[0.06]"
           >
-            <p className="text-[11.5px] font-medium text-light-ink dark:text-dark-ink">
+            <p className="text-[13px] font-medium text-light-ink dark:text-dark-ink">
               审批门：{gate.title}
             </p>
-            <p className="mt-0.5 text-[10.5px] text-light-inkMuted dark:text-dark-inkMuted">{gate.detail}</p>
+            <p className="mt-0.5 text-[12px] text-light-inkMuted dark:text-dark-inkMuted">{gate.detail}</p>
             <div className="mt-2 flex items-center gap-1.5">
-              <button className="btn-solid !h-7 !text-[11.5px]" onClick={onApprove}>
+              <button className="btn-solid !h-7 !text-[13px]" onClick={onApprove}>
                 批准并继续
               </button>
-              <button className="btn-outline !h-7 !text-[11.5px]" onClick={onReject}>
+              <button className="btn-outline !h-7 !text-[13px]" onClick={onReject}>
                 停止
               </button>
-              <span className="text-[10px] text-light-inkFaint dark:text-dark-inkFaint">
+              <span className="text-[11px] text-light-inkFaint dark:text-dark-inkFaint">
                 审批前 worker 的改动只落在集成分支，不会动你的工作区
               </span>
             </div>
@@ -162,11 +178,11 @@ export function RunPanel({
       </AnimatePresence>
 
       <footer className="flex items-center gap-2 px-3.5 py-2 border-t border-light-line dark:border-dark-line">
-        <span className="text-[10.5px] text-light-inkFaint dark:text-dark-inkFaint truncate">
+        <span className="text-[12px] text-light-inkFaint dark:text-dark-inkFaint truncate">
           {run.branch ? `结果分支 ${run.branch}` : run.error ? run.error : 'worktree 隔离 · 完成即合并'}
         </span>
         {run.phase === 'running' && (
-          <button className="ml-auto btn-ghost !h-6 !text-[11px]" onClick={onCancel}>
+          <button className="ml-auto btn-ghost !h-6 !text-[12.5px]" onClick={onCancel}>
             取消
           </button>
         )}

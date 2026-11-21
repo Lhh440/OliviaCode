@@ -1,4 +1,6 @@
 import type { ApprovalMode, DiffHunk } from './types';
+import type { ImageAttachment } from './attachment';
+import type { UsageStep } from './usage';
 import type { ToolRisk } from './tools';
 
 /** 主进程 ⇄ 渲染层（含 preload）共用的协议。 */
@@ -11,6 +13,22 @@ export interface ApprovalRequest {
   risk: ToolRisk;
   detail: string;
   args: Record<string, unknown>;
+  /**
+   * 整文件写入（write_file）的待写入内容。
+   * 审批横幅只有文件名等于盲批，所以主进程在弹审批前把内容一起带过来。
+   */
+  preview?: ApprovalPreview;
+}
+
+export interface ApprovalPreview {
+  /** 将写入的文本，超过上限时只保留开头 */
+  text: string;
+  /** 全文行数 */
+  lines: number;
+  /** 内容超长、text 只是开头时为 true */
+  truncated: boolean;
+  /** 目标文件此前已存在（true = 覆盖写，false = 新建） */
+  existing: boolean;
 }
 
 /** 逐处修改的预览：每一条 edits 一个可勾选单元 */
@@ -34,7 +52,10 @@ export type TurnEvent =
       status: 'ok' | 'error';
       summary: string;
       rows?: string[];
+      /** M7：落盘的图片/音频，界面按 artifact 协议预览 */
+      artifacts?: string[];
     }
+  | { type: 'usage'; usage: UsageStep }
   | { type: 'command.output'; callId: string; chunk: string }
   | {
       type: 'file.proposed';
@@ -55,7 +76,9 @@ export type TurnEvent =
       snapshotId: string;
       callId?: string;
     }
-  | { type: 'turn.done'; ok: boolean; error?: string };
+  | { type: 'turn.done'; ok: boolean; error?: string }
+  /** M8：压缩/整理等状态提示（不是模型输出） */
+  | { type: 'info'; message: string };
 
 export interface TurnEnvelope {
   taskId: string;
@@ -68,6 +91,12 @@ export interface TurnStartArgs {
   workspace: string;
   prompt: string;
   model: string;
+  /** M8：模型所属提供商；不填走设置/环境变量 */
+  providerId?: string;
+  /** M8：当前消息附带的图片 */
+  attachments?: ImageAttachment[];
+  /** M8：自动整理阈值（70–95）；不传由主进程用默认 85 */
+  compactThreshold?: number;
   approval: ApprovalMode;
   allowShell: boolean;
   /** 设置页里填的端点与密钥（只存渲染层内存），优先于环境变量 */

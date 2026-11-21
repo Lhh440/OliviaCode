@@ -7,13 +7,24 @@ import type {
   McpRisk,
   McpServerConfig,
   McpServerState,
+  ImageAttachment,
+  ModelPricing,
+  PricingFile,
+  PreviewState,
+  ProviderConfig,
+  ProviderDraft,
+  ProviderModelsResult,
+  ProviderSaveResult,
+  ProviderTestResult,
   RunRecord,
   ScheduleRecord,
   SkillInfo,
+  TaskMemoryFile,
   TurnEnvelope,
   TurnStartArgs,
   UndoResult,
   UnattendedPolicy,
+  UsageRecord,
   VaultStatus,
   Workflow,
   WorkflowRunArgs,
@@ -32,6 +43,45 @@ declare global {
       env: { baseUrl: string; apiKey: string; model: string; workspace: string };
       theme: {
         set: (mode: 'light' | 'dark') => void;
+      };
+      pricing: {
+        get: () => Promise<PricingFile>;
+        setWindow: (value: number) => Promise<PricingFile>;
+        setModel: (args: {
+          id: string;
+          contextWindow?: number;
+          pricing?: ModelPricing;
+        }) => Promise<PricingFile>;
+        resetModel: (id: string) => Promise<PricingFile>;
+        reset: () => Promise<PricingFile>;
+      };
+      usage: {
+        list: (days?: number) => Promise<UsageRecord[]>;
+        clear: () => Promise<{ ok: boolean }>;
+      };
+      preview: {
+        open: (args: {
+          taskId: string;
+          url: string;
+          bounds: { x: number; y: number; width: number; height: number; visible?: boolean };
+        }) => Promise<{ ok: boolean; error?: string }>;
+        setBounds: (bounds: {
+          x: number;
+          y: number;
+          width: number;
+          height: number;
+          visible?: boolean;
+        }) => Promise<{ ok: boolean }>;
+        navigate: (url: string) => Promise<{ ok: boolean }>;
+        back: () => Promise<{ ok: boolean }>;
+        forward: () => Promise<{ ok: boolean }>;
+        reload: () => Promise<{ ok: boolean }>;
+        setZoom: (factor: number) => Promise<{ ok: boolean }>;
+        allowExternal: () => Promise<{ ok: boolean }>;
+        capture: () => Promise<{ ok: boolean; path?: string; error?: string }>;
+        clearData: () => Promise<{ ok: boolean }>;
+        close: () => Promise<{ ok: boolean }>;
+        onEvent: (listener: (state: PreviewState) => void) => () => void;
       };
       workspace: {
         pick: () => Promise<string | null>;
@@ -70,6 +120,48 @@ declare global {
         }) => Promise<{ ok: boolean; message?: string }>;
         clearModel: () => Promise<{ ok: boolean }>;
       };
+      provider: {
+        list: () => Promise<ProviderConfig[]>;
+        save: (draft: ProviderDraft) => Promise<ProviderSaveResult>;
+        remove: (id: string) => Promise<ProviderSaveResult>;
+        enable: (id: string, enabled: boolean) => Promise<ProviderSaveResult>;
+        fetchModels: (args: {
+          providerId?: string;
+          baseUrl: string;
+          apiKey?: string;
+        }) => Promise<ProviderModelsResult>;
+        test: (draft: ProviderDraft) => Promise<ProviderTestResult>;
+        onEvent: (listener: (providers: ProviderConfig[]) => void) => () => void;
+      };
+      attachments: {
+        save: (input: {
+          dataUrl?: string;
+          filePath?: string;
+          source?: ImageAttachment['source'];
+          name?: string;
+        }) => Promise<{ ok: boolean; error?: string; attachment?: ImageAttachment }>;
+        adopt: (
+          filePath: string,
+          source?: ImageAttachment['source'],
+        ) => Promise<{ ok: boolean; error?: string; attachment?: ImageAttachment }>;
+      };
+      memory: {
+        get: (taskId: string) => Promise<TaskMemoryFile | null>;
+        compact: (args: {
+          taskId: string;
+          providerId?: string;
+          model?: string;
+        }) => Promise<{ ok: boolean; error?: string; file?: TaskMemoryFile }>;
+        revert: (
+          taskId: string,
+          checkpointId?: string | null,
+        ) => Promise<{ ok: boolean; file?: TaskMemoryFile }>;
+        clear: (taskId: string) => Promise<{ ok: boolean }>;
+        clearAll: () => Promise<{ ok: boolean }>;
+        onEvent: (
+          listener: (payload: { taskId: string | null; file: TaskMemoryFile | null }) => void,
+        ) => () => void;
+      };
       schedules: {
         list: () => Promise<ScheduleRecord[]>;
         runs: (scheduleId: string) => Promise<RunRecord[]>;
@@ -80,6 +172,7 @@ declare global {
           schedules?: ScheduleRecord[];
           created?: string[];
           disabled?: string[];
+          invalid?: string[];
           error?: string;
         }>;
         update: (

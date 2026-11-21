@@ -1,14 +1,18 @@
 {
   "name": "@olivia/desktop",
-  "version": "0.8.0",
+  "version": "0.10.0",
   "private": true,
   "main": "dist/main.cjs",
   "scripts": {
-    "build": "esbuild src/main.ts src/preload.ts src/selftest.ts src/wf-selftest.ts src/exec-selftest.ts src/scheduler-selftest.ts src/mcp-selftest.ts src/skill-selftest.ts --bundle --platform=node --target=node20 --format=cjs --external:electron --outdir=dist --out-extension:.js=.cjs --log-level=warning",
+    "build": "esbuild src/main.ts src/preload.ts src/preview-host.ts src/selftest.ts src/wf-selftest.ts src/exec-selftest.ts src/scheduler-selftest.ts src/mcp-selftest.ts src/skill-selftest.ts src/usage-selftest.ts src/memory-selftest.ts src/provider-selftest.ts src/guards-selftest.ts --bundle --platform=node --target=node20 --format=cjs --external:electron --outdir=dist --out-extension:.js=.cjs --log-level=warning",
     "test:wf": "node dist/wf-selftest.cjs",
     "test:exec": "node dist/exec-selftest.cjs",
     "test:sched": "node dist/scheduler-selftest.cjs",
     "test:mcp": "node dist/mcp-selftest.cjs",
-    "test:skill": "node dist/skill-selftest.cjs"
+    "test:skill": "node dist/skill-selftest.cjs",
+    "test:usage": "node dist/usage-selftest.cjs",
+    "test:memory": "node dist/memory-selftest.cjs",
+    "test:provider": "node dist/provider-selftest.cjs",
+    "test:guards": "node dist/guards-selftest.cjs"
   }
 }

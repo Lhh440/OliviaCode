@@ -5,9 +5,20 @@ import type {
   GitProvider,
   GitRepoState,
   GitPrResult,
+  ImageAttachment,
+  ModelPricing,
+  PricingFile,
+  PreviewState,
+  ProviderConfig,
+  ProviderDraft,
+  ProviderModelsResult,
+  ProviderSaveResult,
+  ProviderTestResult,
+  TaskMemoryFile,
   TurnEnvelope,
   TurnStartArgs,
   UndoResult,
+  UsageRecord,
   VaultStatus,
   WorkflowRunArgs,
   WorkflowRunEvent,
@@ -22,7 +33,7 @@ try {
 }
 
 contextBridge.exposeInMainWorld('olivia', {
-  version: '0.8.0',
+  version: '0.10.0',
   platform: process.platform,
   desktop: true,
   env,
@@ -30,6 +41,56 @@ contextBridge.exposeInMainWorld('olivia', {
     /** 把当前皮肤明暗同步给原生控件，避免暗色皮肤配亮色下拉框 */
     set: (mode: 'light' | 'dark'): void => {
       ipcRenderer.send('olivia:theme', mode);
+    },
+  },
+  // —— M7：价格表、用量账本、内置预览 ——
+  pricing: {
+    get: (): Promise<PricingFile> => ipcRenderer.invoke('olivia:pricing.get'),
+    setWindow: (value: number): Promise<PricingFile> =>
+      ipcRenderer.invoke('olivia:pricing.set-window', value),
+    setModel: (args: {
+      id: string;
+      contextWindow?: number;
+      pricing?: ModelPricing;
+    }): Promise<PricingFile> => ipcRenderer.invoke('olivia:pricing.set-model', args),
+    resetModel: (id: string): Promise<PricingFile> =>
+      ipcRenderer.invoke('olivia:pricing.reset-model', id),
+    reset: (): Promise<PricingFile> => ipcRenderer.invoke('olivia:pricing.reset'),
+  },
+  usage: {
+    list: (days?: number): Promise<UsageRecord[]> => ipcRenderer.invoke('olivia:usage.list', days),
+    clear: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('olivia:usage.clear'),
+  },
+  preview: {
+    open: (args: {
+      taskId: string;
+      url: string;
+      bounds: { x: number; y: number; width: number; height: number; visible?: boolean };
+    }): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('olivia:preview.open', args),
+    setBounds: (bounds: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      visible?: boolean;
+    }): Promise<{ ok: boolean }> => ipcRenderer.invoke('olivia:preview.set-bounds', bounds),
+    navigate: (url: string): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke('olivia:preview.navigate', url),
+    back: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('olivia:preview.back'),
+    forward: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('olivia:preview.forward'),
+    reload: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('olivia:preview.reload'),
+    setZoom: (factor: number): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke('olivia:preview.zoom', factor),
+    allowExternal: (): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke('olivia:preview.allow-external'),
+    capture: (): Promise<{ ok: boolean; path?: string; error?: string }> =>
+      ipcRenderer.invoke('olivia:preview.capture'),
+    clearData: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('olivia:preview.clear-data'),
+    close: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('olivia:preview.close'),
+    onEvent: (listener: (state: PreviewState) => void): (() => void) => {
+      const handler = (_event: unknown, state: PreviewState): void => listener(state);
+      ipcRenderer.on('olivia:preview.event', handler);
+      return () => ipcRenderer.removeListener('olivia:preview.event', handler);
     },
   },
   workspace: {
@@ -95,6 +156,69 @@ contextBridge.exposeInMainWorld('olivia', {
     }): Promise<{ ok: boolean; message?: string }> =>
       ipcRenderer.invoke('olivia:vault.model-set', input),
     clearModel: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('olivia:vault.model-clear'),
+  },
+  // —— M8：多提供商 ——
+  provider: {
+    list: (): Promise<ProviderConfig[]> => ipcRenderer.invoke('olivia:provider.list'),
+    save: (draft: ProviderDraft): Promise<ProviderSaveResult> =>
+      ipcRenderer.invoke('olivia:provider.save', draft),
+    remove: (id: string): Promise<ProviderSaveResult> => ipcRenderer.invoke('olivia:provider.remove', id),
+    enable: (id: string, enabled: boolean): Promise<ProviderSaveResult> =>
+      ipcRenderer.invoke('olivia:provider.enable', { id, enabled }),
+    fetchModels: (args: {
+      providerId?: string;
+      baseUrl: string;
+      apiKey?: string;
+    }): Promise<ProviderModelsResult> => ipcRenderer.invoke('olivia:provider.fetch-models', args),
+    test: (draft: ProviderDraft): Promise<ProviderTestResult> =>
+      ipcRenderer.invoke('olivia:provider.test', draft),
+    onEvent: (listener: (providers: ProviderConfig[]) => void): (() => void) => {
+      const handler = (_event: unknown, providers: ProviderConfig[]): void => listener(providers);
+      ipcRenderer.on('olivia:provider.event', handler);
+      return () => ipcRenderer.removeListener('olivia:provider.event', handler);
+    },
+  },
+  // —— M8：图片附件（只落 artifacts，不把 base64 交给渲染层日志）——
+  attachments: {
+    save: (input: {
+      dataUrl?: string;
+      filePath?: string;
+      source?: ImageAttachment['source'];
+      name?: string;
+    }): Promise<{ ok: boolean; error?: string; attachment?: ImageAttachment }> =>
+      ipcRenderer.invoke('olivia:attachment.save', input),
+    adopt: (
+      filePath: string,
+      source?: ImageAttachment['source'],
+    ): Promise<{ ok: boolean; error?: string; attachment?: ImageAttachment }> =>
+      ipcRenderer.invoke('olivia:attachment.adopt', { filePath, source }),
+  },
+  // —— M8：任务记忆与检查点 ——
+  memory: {
+    get: (taskId: string): Promise<TaskMemoryFile | null> => ipcRenderer.invoke('olivia:memory.get', taskId),
+    compact: (args: {
+      taskId: string;
+      providerId?: string;
+      model?: string;
+    }): Promise<{ ok: boolean; error?: string; file?: TaskMemoryFile }> =>
+      ipcRenderer.invoke('olivia:memory.compact', args),
+    revert: (
+      taskId: string,
+      checkpointId?: string | null,
+    ): Promise<{ ok: boolean; file?: TaskMemoryFile }> =>
+      ipcRenderer.invoke('olivia:memory.revert', { taskId, checkpointId }),
+    clear: (taskId: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('olivia:memory.clear', taskId),
+    clearAll: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('olivia:memory.clear-all'),
+    onEvent: (
+      listener: (payload: { taskId: string | null; file: TaskMemoryFile | null }) => void,
+    ): (() => void) => {
+      const handler = (
+        _event: unknown,
+        payload: { taskId: string | null; file: TaskMemoryFile | null },
+      ): void => listener(payload);
+      ipcRenderer.on('olivia:memory.event', handler);
+      return () => ipcRenderer.removeListener('olivia:memory.event', handler);
+    },
   },
   schedules: {
     list: (): Promise<unknown[]> => ipcRenderer.invoke('olivia:schedules.list'),

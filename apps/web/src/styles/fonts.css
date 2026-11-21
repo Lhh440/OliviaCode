@@ -1,8 +1,67 @@
-/* 古典刻本宋（用户提供的字体包），只做一种字重。 */
+/* —— 应用字体：Inter（拉丁）+ HarmonyOS Sans SC（汉字） ——
+   两套字体都自托管在 `assets/fonts/` 下，Electron 走 file://，不依赖网络。
+
+   Inter 用可变字体：一个文件覆盖 100–900，按 unicode-range 切成 Latin / Latin Ext
+   两个子集，斜体单独一份（`思考过程`、引用块、`em` 用得上）。
+   汉字用 HarmonyOS Sans SC 的 Regular 与 Medium：
+   - 400 → Regular
+   - 500 / 600 → Medium（Tailwind 的 font-semibold 落在这一档；
+     不用浏览器合成加粗——Windows 上合成加粗会把 13–15px 的字糊成一团）
+   700 没有单独文件，按 CSS 的匹配规则会落到 Medium，视觉上仍然明显重于正文。 */
+
 @font-face {
-  font-family: 'Olivia Song';
-  src: url('../assets/fonts/AaGuDianKeBenSong.ttf') format('truetype');
-  font-weight: 400;
+  font-family: 'Inter';
   font-style: normal;
+  font-weight: 100 900;
   font-display: swap;
+  src: url('../assets/fonts/inter-latin-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('../assets/fonts/inter-latin-ext-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308,
+    U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113,
+    U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('../assets/fonts/inter-latin-wght-italic.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'HarmonyOS Sans SC';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../assets/fonts/HarmonyOS_Sans_SC_Regular.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'HarmonyOS Sans SC';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('../assets/fonts/HarmonyOS_Sans_SC_Medium.ttf') format('truetype');
+}
+
+/* 同一个 Medium 文件再挂一次 600：font-semibold 直接命中，
+   就不会由 400 合成出一档边缘发毛的假粗体。 */
+@font-face {
+  font-family: 'HarmonyOS Sans SC';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('../assets/fonts/HarmonyOS_Sans_SC_Medium.ttf') format('truetype');
 }

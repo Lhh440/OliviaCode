@@ -1,3 +1,6 @@
+import type { ImageAttachment } from './attachment';
+import { BUILTIN_PRICING, type ModelPricing, type UsageStep } from './usage';
+
 export type ApprovalMode = 'ask' | 'auto' | 'never';
 
 export type TaskStatus = 'idle' | 'running' | 'waiting' | 'done' | 'failed' | 'stopped';
@@ -12,6 +15,8 @@ export interface ToolRun {
   output?: string;
   risk?: 'read' | 'write' | 'exec';
   args?: Record<string, unknown>;
+  /** M7：工具返回的图片/音频等文件（绝对路径），界面走 artifact 协议预览 */
+  artifacts?: string[];
 }
 
 export interface DiffLine {
@@ -47,7 +52,8 @@ export type Part =
   | { kind: 'text'; text: string }
   | { kind: 'thinking'; text: string; done: boolean }
   | { kind: 'tool'; run: ToolRun }
-  | { kind: 'diff'; diff: DiffFile };
+  | { kind: 'diff'; diff: DiffFile }
+  | { kind: 'image'; attachment: ImageAttachment };
 
 export interface Message {
   id: string;
@@ -55,6 +61,8 @@ export interface Message {
   parts: Part[];
   at: number;
   streaming?: boolean;
+  /** 这一回合失败了：界面在消息下方留一条红色标记，别让失败悄悄消失 */
+  failed?: string;
 }
 
 export interface Task {
@@ -62,34 +70,62 @@ export interface Task {
   title: string;
   branch: string;
   model: string;
+  /** M8：模型所属提供商；不填 = 内置/环境变量 */
+  providerId?: string;
   approval: ApprovalMode;
   status: TaskStatus;
   at: number;
   messages: Message[];
   /** 每个任务绑定的工作区目录；M1 起任务之间互不串味 */
   workspace?: string;
+  /** M7：本任务的逐步用量；从会话日志重放或流式累积 */
+  usage?: UsageStep[];
 }
 
 export interface Settings {
   baseUrl: string;
   apiKey: string;
   model: string;
+  /** M8：选中的提供商；不填 = 内置/环境变量 */
+  providerId?: string;
   approval: ApprovalMode;
   demo: boolean;
   /** 命令执行总开关：默认关闭，需要用户在设置里显式确认风险 */
   allowShell: boolean;
+  /** M7：未知模型的上下文窗口回退 */
+  defaultContextWindow: number;
+  /** M8：自动整理上下文的阈值（百分比） */
+  compactThreshold: number;
 }
 
 export interface ModelInfo {
   id: string;
   label: string;
   short: string;
+  /** M7：上下文窗口 */
+  contextWindow: number;
+  /** M7：参考价；未知/自定义模型可以为空 */
+  pricing?: ModelPricing;
+  /** M8：是否支持图片输入（内置模型默认关闭） */
+  vision?: boolean;
 }
 
 /** 与后端 /models 对齐的真实 id；label 只用于展示。 */
 export const MODELS: ModelInfo[] = [
-  { id: 'deepseek-v4.1-flash', label: 'DeepSeek V4.1 Flash', short: 'DeepSeek 4.1' },
-  { id: 'qwen3.8-27b', label: 'Qwen3.8 27B', short: 'Qwen3.8' },
+  {
+    id: 'deepseek-v4.1-flash',
+    label: 'DeepSeek V4.1 Flash',
+    short: 'DeepSeek 4.1',
+    contextWindow: 128_000,
+    pricing: BUILTIN_PRICING['deepseek-v4.1-flash'],
+  },
+  {
+    id: 'qwen3-14b',
+    label: 'Qwen3 14B',
+    short: 'Qwen3-14B',
+    contextWindow: 128_000,
+    pricing: BUILTIN_PRICING['qwen3-14b'],
+  },
 ];
 
 export function modelLabel(id: string | undefined): string {

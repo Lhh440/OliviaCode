@@ -1,4 +1,4 @@
-/* —— 动态主题背景（M7）—— */
+/* —— 主题场景：黑鱼白水 / 白鱼黑水 —— */
 .scene {
   position: fixed;
   inset: 0;
@@ -11,79 +11,86 @@
 .scene-base {
   position: absolute;
   inset: 0;
+  transition: background-color 0.7s ease;
 }
 
-/* 新图层从透明淡入，压在旧图层上；旧图层 1.6s 后卸载 */
+/* 新场景淡入；旧场景停在最后一帧淡出，像水面换了一次光 */
 .scene-layer {
   position: absolute;
   inset: 0;
-  animation: scene-in 1.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: scene-in 1.05s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .scene-layer.is-prev {
-  animation: none;
-  opacity: 1;
+  animation: scene-out 1.4s ease forwards;
 }
 
 @keyframes scene-in {
   from {
     opacity: 0;
-    filter: saturate(0.6) brightness(0.7);
   }
   to {
     opacity: 1;
-    filter: none;
   }
 }
 
-.scene-media {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  backface-visibility: hidden;
-}
-
-.scene-video {
-  transform: scale(1.015);
-  transition: opacity 1.1s ease;
-}
-
-/* 静图：慢速推镜，掩盖低分辨率 */
-.scene-image {
-  animation: scene-kenburns 52s ease-in-out infinite alternate;
-  will-change: transform;
-}
-
-@keyframes scene-kenburns {
+@keyframes scene-out {
   from {
-    transform: scale(1.02) translate3d(0, 0, 0);
+    opacity: 1;
   }
   to {
-    transform: scale(1.12) translate3d(-1.2%, -1.6%, 0);
+    opacity: 0;
   }
 }
 
-.scene-scrim {
+.koi-canvas {
   position: absolute;
   inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
+/* 暗角：浅色主题是纸边微微压灰，深色主题是夜水沉下去。
+   上下两条只做很轻的收边，鱼在水里的明度才不会被压平。 */
 .scene-vignette {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(120% 80% at 50% 50%, transparent 40%, rgba(4, 6, 9, 0.45) 100%),
-    linear-gradient(180deg, rgba(4, 6, 9, 0.55) 0%, transparent 18%, transparent 78%, rgba(4, 6, 9, 0.62) 100%);
+    radial-gradient(122% 82% at 50% 46%, transparent 50%, rgba(206, 201, 187, 0.2) 100%),
+    linear-gradient(
+      180deg,
+      rgba(247, 246, 241, 0.28) 0%,
+      transparent 15%,
+      transparent 82%,
+      rgba(240, 238, 231, 0.24) 100%
+    );
 }
 
+.dark .scene-vignette {
+  background:
+    radial-gradient(122% 82% at 50% 46%, transparent 48%, rgba(0, 0, 0, 0.42) 100%),
+    linear-gradient(
+      180deg,
+      rgba(4, 5, 6, 0.34) 0%,
+      transparent 15%,
+      transparent 82%,
+      rgba(4, 5, 6, 0.36) 100%
+    );
+}
+
+/* 纸纹 / 水汽：一层很轻的噪点，别让大面积纯色太平 */
 .scene-grain {
   position: absolute;
   inset: 0;
-  opacity: 0.055;
-  mix-blend-mode: overlay;
+  opacity: 0.05;
+  mix-blend-mode: multiply;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+}
+
+.dark .scene-grain {
+  opacity: 0.055;
+  mix-blend-mode: screen;
 }
 
 .scene-fallback {
@@ -100,31 +107,85 @@
   pointer-events: none;
 }
 
-/* 对话正文的阅读遮罩：中间压暗、两侧羽化，背景仍然透出来 */
-.chat-veil {
+/* 阅读衬底：主内容区（侧栏右侧）铺一层半透明的「纸」。
+   鱼在纸下面还剩一层很淡的影，正文、表单与标题都在纸上面，
+   不再出现黑字压黑鱼、白字压白鱼的情况。
+   画布那边还会按「阅读带」再压一档，这层纸只负责把纸感给足。 */
+.pane-veil {
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  top: 6px;
-  bottom: 6px;
-  width: min(920px, calc(100% - 10px));
-  border-radius: 24px;
+  inset: 0;
+  z-index: -1;
   pointer-events: none;
   background: linear-gradient(
     180deg,
-    rgba(7, 11, 15, 0.34) 0%,
-    rgba(7, 11, 15, 0.58) 10%,
-    rgba(7, 11, 15, 0.62) 82%,
-    rgba(7, 11, 15, 0.24) 100%
+    rgba(248, 247, 242, 0.4) 0%,
+    rgba(248, 247, 242, 0.46) 16%,
+    rgba(248, 247, 242, 0.5) 100%
   );
-  backdrop-filter: blur(7px) saturate(0.94);
-  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 6%, #000 94%, transparent 100%);
-  mask-image: linear-gradient(90deg, transparent 0%, #000 6%, #000 94%, transparent 100%);
+}
+
+.dark .pane-veil {
+  background: linear-gradient(
+    180deg,
+    rgba(6, 7, 8, 0.46) 0%,
+    rgba(6, 7, 8, 0.52) 16%,
+    rgba(6, 7, 8, 0.56) 100%
+  );
+}
+
+/* 对话区的阅读衬底：在主内容纸面上再轻压一层，让长段落更稳。 */
+.chat-scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(248, 247, 242, 0.1) 0%,
+    rgba(248, 247, 242, 0.2) 18%,
+    rgba(248, 247, 242, 0.24) 100%
+  );
+}
+
+.dark .chat-scrim {
+  background: linear-gradient(
+    180deg,
+    rgba(6, 7, 8, 0.12) 0%,
+    rgba(6, 7, 8, 0.24) 18%,
+    rgba(6, 7, 8, 0.28) 100%
+  );
+}
+
+/* 留白页的标题衬底：大字压在鱼身上最刺眼，所以标题自己带一块羽化的纸。
+   用径向渐变而不是盒子，边缘不出现硬边；`.text-plate` 的墨色渐变照常。 */
+.hero-plate {
+  position: relative;
+  isolation: isolate;
+}
+
+.hero-plate::before {
+  content: '';
+  position: absolute;
+  inset: -34px -56px -30px;
+  z-index: -1;
+  background: radial-gradient(
+    62% 68% at 50% 48%,
+    rgba(251, 250, 246, 0.88) 0%,
+    rgba(251, 250, 246, 0.6) 54%,
+    rgba(251, 250, 246, 0) 100%
+  );
+}
+
+.dark .hero-plate::before {
+  background: radial-gradient(
+    62% 68% at 50% 48%,
+    rgba(7, 8, 9, 0.9) 0%,
+    rgba(7, 8, 9, 0.62) 54%,
+    rgba(7, 8, 9, 0) 100%
+  );
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .scene-layer,
-  .scene-image {
+  .scene-layer {
     animation: none;
   }
   .ripple-layer {

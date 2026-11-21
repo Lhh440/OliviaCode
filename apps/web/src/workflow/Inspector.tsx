@@ -1,6 +1,22 @@
 import type { ReactNode } from 'react';
-import { KINDS, MODELS, STATUS_LABEL, TOOL_NAMES, type WfNode } from '@olivia/core';
+import {
+  KINDS,
+  MODELS,
+  STATUS_LABEL,
+  TOOL_NAMES,
+  describeCron,
+  tryParseCron,
+  type WfNode,
+} from '@olivia/core';
 import { Icon } from '../icons';
+
+/** 常见频率的预置：这里给的是能直接过校验器的标准 5 段 cron。 */
+const CRON_PRESETS: { label: string; cron: string }[] = [
+  { label: '每晚 22:00', cron: '0 22 * * *' },
+  { label: '每天 09:00', cron: '0 9 * * *' },
+  { label: '每 6 小时', cron: '0 */6 * * *' },
+  { label: '每周一 10:00', cron: '0 10 * * 1' },
+];
 
 interface Props {
   node: WfNode | null;
@@ -62,17 +78,42 @@ export function Inspector({ node, onPatch, onDelete, onInsert, mcpServers = [] }
 
         {node.kind === 'trigger' && (
           <>
-            <Field label="触发频率">
-              <select
-                className="input"
-                value={node.schedule ?? '每晚 22:00'}
+            <Field label="触发频率（cron · 分 时 日 月 周）">
+              <input
+                className="input font-mono"
+                value={node.schedule ?? ''}
+                placeholder="0 22 * * *"
+                spellCheck={false}
                 onChange={(event) => onPatch({ schedule: event.target.value })}
-              >
-                {['每晚 22:00', '每天 09:00', '每 6 小时', '每周一 10:00'].map((option) => (
-                  <option key={option}>{option}</option>
-                ))}
-              </select>
+              />
             </Field>
+            {(() => {
+              const source = (node.schedule ?? '').trim();
+              if (!source) return <p className="field-hint">填了 cron 才会出现在「计划」页。</p>;
+              const parsed = tryParseCron(source);
+              return parsed.ok ? (
+                <p className="field-hint">
+                  {describeCron(source)} · 这条会出现在「计划」页，新计划默认暂停。
+                </p>
+              ) : (
+                <p className="field-hint text-red-600 dark:text-red-400">
+                  cron 不合法：{parsed.error}
+                </p>
+              );
+            })()}
+            <div className="flex flex-wrap gap-1">
+              {CRON_PRESETS.map((preset) => (
+                <button
+                  key={preset.cron}
+                  type="button"
+                  onClick={() => onPatch({ schedule: preset.cron, title: preset.label })}
+                  className="text-[11.5px] px-1.5 py-0.5 rounded border border-light-line dark:border-dark-line text-light-inkMuted dark:text-dark-inkMuted hover:text-light-ink dark:hover:text-dark-ink transition-colors"
+                  title={preset.cron}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
             <Field label="时区">
               <select
                 className="input"
@@ -83,9 +124,6 @@ export function Inspector({ node, onPatch, onDelete, onInsert, mcpServers = [] }
                 <option>UTC</option>
               </select>
             </Field>
-            <p className="field-hint">
-              这条 cron 会出现在「计划」页；新计划默认暂停，需在那边确认启用后才会自动运行。
-            </p>
           </>
         )}
 

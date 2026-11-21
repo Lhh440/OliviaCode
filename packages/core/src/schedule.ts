@@ -9,6 +9,7 @@
  * - 大月/小月、闰年、夏令时都由 Intl 的本地时间换算兜底，不做手工日历运算。
  */
 import type { Workflow } from './workflow';
+import type { UsageTotals } from './usage';
 
 // —— 无人值守策略 ——
 
@@ -26,6 +27,10 @@ export interface UnattendedPolicy {
   maxNodes: number;
   /** 单次运行模型步数上限 */
   maxSteps: number;
+  /** M7：单次运行 token 上限（输入+输出） */
+  maxTokens: number;
+  /** M7：单次运行参考费用上限（美元），0 = 不设 */
+  maxCost: number;
   /** 允许在无人值守时使用的 MCP 服务器；默认空 = 一律禁止 */
   allowedMcpServers: string[];
 }
@@ -36,6 +41,8 @@ export const DEFAULT_UNATTENDED_POLICY: UnattendedPolicy = {
   maxWallMinutes: 30,
   maxNodes: 24,
   maxSteps: 80,
+  maxTokens: 1_000_000,
+  maxCost: 0,
   allowedMcpServers: [],
 };
 
@@ -84,6 +91,8 @@ export interface RunRecord {
   /** 错过的运行次数（本 tick 只补最近一次） */
   missed?: number;
   nodes: Record<string, NodeRunSummary>;
+  /** M7：本次运行的用量汇总 */
+  usage?: UsageTotals;
 }
 
 export interface SchedulerEvent {

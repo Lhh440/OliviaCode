@@ -20,7 +20,9 @@ function Shell() {
 
       <div className="relative z-10 flex h-full">
         <Sidebar route={route} />
-        <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <main className="relative flex-1 flex flex-col min-w-0 overflow-hidden isolate">
+          {/* 阅读衬底：鱼在水里，正文在纸上；这一层把鱼压成水印，面板再盖在它上面 */}
+          <div className="pane-veil" aria-hidden="true" />
           {route === 'chat' && <ChatView />}
           {route === 'workflow' && <WorkflowView />}
           {route === 'schedules' && <SchedulesView />}

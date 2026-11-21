@@ -1,4 +1,5 @@
 export * from './types';
+export * from './errors';
 export * from './workflow';
 export * from './workflow-run';
 export * from './schedule';
@@ -8,3 +9,8 @@ export * from './tools';
 export * from './session';
 export * from './diff';
 export * from './ipc';
+export * from './usage';
+export * from './preview';
+export * from './provider';
+export * from './attachment';
+export * from './memory';

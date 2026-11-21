@@ -2,10 +2,20 @@ import { existsSync } from 'node:fs';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import {
+  DEFAULT_CONTEXT_WINDOW,
+  addUsageTotals,
+  costOf,
+  emptyUsageTotals,
   phaseToNodeStatus,
+  resolveContextWindow,
+  resolvePricing,
+  type ModelPricing,
   type NodeRunState,
+  type PricingFile,
   type RunPhase,
   type ToolRegistry,
+  type UsageStep,
+  type UsageTotals,
   type WfNode,
   type Workflow,
   type WorkflowRunEvent,
@@ -39,8 +49,10 @@ export interface WorkflowRuntimeOptions {
   emit: (event: WorkflowRunEvent) => void;
   requestGate: (node: WfNode, detail: string) => Promise<boolean>;
   signal: AbortSignal;
-  /** 无人值守预算：墙钟上限（分钟）与整轮模型步数上限 */
-  budget?: { maxWallMinutes: number; maxSteps: number };
+  /** 无人值守预算：墙钟上限（分钟）、整轮模型步数，以及 M7 的 token/费用上限 */
+  budget?: { maxWallMinutes: number; maxSteps: number; maxTokens?: number; maxCost?: number };
+  /** M7：价格与窗口快照；交互式也要用来显示用量 */
+  pricing?: PricingFile;
   /** 无人值守时的审批门策略；不传 = 交互式（等人） */
   gatePolicy?: 'pause-and-notify' | 'auto-approve' | 'auto-reject';
   /** 每执行一个工具调用回调一次：外部据此扣预算 */
@@ -236,6 +248,7 @@ export async function runWorkflow(options: WorkflowRuntimeOptions): Promise<Work
     startedAt,
     nodes: {},
     logs: [],
+    usage: emptyUsageTotals(),
   };
   for (const node of workflow.nodes) {
     state.nodes[node.id] = { nodeId: node.id, title: node.title, phase: 'queued', attempts: 0 };
@@ -363,6 +376,42 @@ export async function runWorkflow(options: WorkflowRuntimeOptions): Promise<Work
     };
   }
 
+  const priceFor = (model: string): ModelPricing | null =>
+    resolvePricing(model, options.pricing?.models ?? null);
+  const windowFor = (model: string): number =>
+    resolveContextWindow(
+      model,
+      options.pricing?.defaultContextWindow ?? DEFAULT_CONTEXT_WINDOW,
+      options.pricing?.models ?? null,
+    );
+
+  let usageTotals: UsageTotals = emptyUsageTotals();
+  const nodeUsage = new Map<string, UsageTotals>();
+  /** M7：每步用量；同时扣 token/费用预算，超限在模型调用边界中止。 */
+  const recordUsage = (nodeId: string, step: UsageStep): void => {
+    const cost = costOf(step, priceFor(step.model ?? options.model));
+    usageTotals = addUsageTotals(usageTotals, step, cost);
+    const nextNode = addUsageTotals(nodeUsage.get(nodeId) ?? emptyUsageTotals(), step, cost);
+    nodeUsage.set(nodeId, nextNode);
+    state.usage = usageTotals;
+    const nodeState = state.nodes[nodeId];
+    if (nodeState) nodeState.usage = nextNode;
+    emit({ type: 'usage', nodeId, usage: structuredClone(usageTotals), nodeUsage: structuredClone(nextNode) });
+
+    const maxTokens = options.budget?.maxTokens ?? 0;
+    if (maxTokens > 0 && usageTotals.input + usageTotals.output > maxTokens && !budgetHit) {
+      budgetHit = `token 超过上限 ${maxTokens}`;
+      log(`无人值守预算触发：${budgetHit}，终止本次运行`, 'error');
+      runAbort.abort();
+    }
+    const maxCost = options.budget?.maxCost ?? 0;
+    if (maxCost > 0 && (usageTotals.costUsd ?? 0) > maxCost && !budgetHit) {
+      budgetHit = `参考费用超过上限 $${maxCost}`;
+      log(`无人值守预算触发：${budgetHit}，终止本次运行`, 'error');
+      runAbort.abort();
+    }
+  };
+
   const runAgentNode = async (node: WfNode): Promise<RunPhase> => {
     const branch = `olivia/wf-${short}-${node.id}`;
     const dir = path.join(baseDir, node.id);
@@ -406,6 +455,10 @@ export async function runWorkflow(options: WorkflowRuntimeOptions): Promise<Work
             sessions: silentSessions(),
             tools: resolveTools(node),
             emit: (event: TurnEvent): void => {
+              if (event.type === 'usage') {
+                recordUsage(node.id, event.usage);
+                return;
+              }
               if (event.type === 'text') {
                 text += event.delta;
                 return;
@@ -432,6 +485,8 @@ export async function runWorkflow(options: WorkflowRuntimeOptions): Promise<Work
             skillCatalog: options.skillCatalog,
             loadSkill: options.loadSkill,
             mcpServers: options.mcpServers,
+            contextWindow: windowFor(node.model || options.model),
+            compactThreshold: 85,
           });
         } finally {
           budget.dispose();
@@ -508,6 +563,10 @@ export async function runWorkflow(options: WorkflowRuntimeOptions): Promise<Work
         sessions: silentSessions(),
         tools: resolveTools({ ...node, tools: node.tools?.length ? node.tools : ['read', 'git'] }),
         emit: (event: TurnEvent): void => {
+          if (event.type === 'usage') {
+            recordUsage(node.id, event.usage);
+            return;
+          }
           if (event.type === 'text') text += event.delta;
           if (event.type === 'tool.request') {
             log(`${event.call.name} · ${event.call.detail}`, 'tool', node.id);
@@ -524,6 +583,7 @@ export async function runWorkflow(options: WorkflowRuntimeOptions): Promise<Work
         loadSkill: options.loadSkill,
         // 评审节点只读，MCP 工具一律不给（避免评审顺手改外部系统）
         mcpServers: [],
+        contextWindow: windowFor(node.model || options.model),
       });
       if (signal.aborted) {
         setPhase(node.id, 'canceled', { error: '已取消', endedAt: Date.now() });

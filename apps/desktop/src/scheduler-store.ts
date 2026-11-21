@@ -1,6 +1,10 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import type { RunRecord, ScheduleRecord } from '@olivia/core';
+import {
+  DEFAULT_UNATTENDED_POLICY,
+  type RunRecord,
+  type ScheduleRecord,
+} from '@olivia/core';
 
 /**
  * 排期账本：`schedules.json`（注册表）+ `runs/<id>.json`（每次运行）。
@@ -32,10 +36,16 @@ export class SchedulerStore {
       const raw = await fs.readFile(this.schedulesFile, 'utf8');
       const parsed = JSON.parse(raw) as unknown;
       const list = Array.isArray(parsed) ? parsed : [];
-      this.cache = list.filter(
-        (item): item is ScheduleRecord =>
-          Boolean(item) && typeof item === 'object' && typeof (item as ScheduleRecord).id === 'string',
-      );
+      this.cache = list
+        .filter(
+          (item): item is ScheduleRecord =>
+            Boolean(item) && typeof item === 'object' && typeof (item as ScheduleRecord).id === 'string',
+        )
+        // M7：老计划没有 token/费用上限字段，读的时候按默认值补齐
+        .map((item) => ({
+          ...item,
+          policy: { ...DEFAULT_UNATTENDED_POLICY, ...item.policy },
+        }));
     } catch (error) {
       this.cache = [];
       if (error instanceof SyntaxError) {

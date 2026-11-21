@@ -5,49 +5,59 @@ export default {
   theme: {
     extend: {
       colors: {
-        // 亮色 · 古典主义（象牙纸 / 钴蓝 / 鎏金）
+        // 浅色 · 黑鱼白水：纸白的水、墨黑的鱼、一点暖赭
         light: {
-          bg: '#f2efe8',
-          ink: '#16181f',
-          inkMuted: '#5c5a52',
-          inkFaint: '#8d8a80',
-          line: '#ddd7c9',
-          lineStrong: '#c9c1ae',
-          accent: '#2f5bd7',
-          accentSoft: '#e7ebf9',
-          gold: '#a8853f',
-          panel: 'rgba(252,250,245,0.66)',
-          panelStrong: 'rgba(253,252,248,0.86)',
+          bg: '#f2f1ec',
+          ink: '#14161a',
+          inkMuted: '#565a61',
+          inkFaint: '#83868d',
+          line: '#dedcd5',
+          lineStrong: '#c8c5bc',
+          accent: '#14161a',
+          accentSoft: 'rgba(20,22,26,0.07)',
+          gold: '#a07850',
+          panel: 'rgba(252,251,247,0.72)',
+          panelStrong: 'rgba(255,254,250,0.95)',
         },
-        // 暗色玻璃：所有主题共用同一套中性表面，强调色由 CSS 变量驱动
+        // 深色 · 白鱼黑水：夜水、骨白的鱼、微光
         dark: {
-          bg: '#0a0e12',
-          ink: '#eef2f4',
-          inkMuted: '#a7b2ba',
-          inkFaint: '#87929b',
-          line: '#1e252c',
-          lineStrong: '#2b3540',
-          accent: '#6ea6c9',
-          accentSoft: 'rgba(110,166,201,0.14)',
-          gold: '#c9b48a',
-          panel: 'rgba(12,17,22,0.66)',
-          panelStrong: 'rgba(14,20,26,0.88)',
+          bg: '#08090a',
+          ink: '#f2f1ec',
+          inkMuted: '#a5a6a4',
+          inkFaint: '#7a7c80',
+          line: '#232529',
+          lineStrong: '#33363b',
+          accent: '#f2f1ec',
+          accentSoft: 'rgba(242,241,236,0.10)',
+          gold: '#c9a887',
+          panel: 'rgba(12,13,15,0.74)',
+          panelStrong: 'rgba(15,16,18,0.94)',
         },
       },
+      // 全站一套字体：Inter 管拉丁，HarmonyOS Sans SC 管汉字（见 styles/fonts.css）。
+      // Inter 没有汉字，汉字自动落到后面的 HarmonyOS；两者都没有的字形才用系统字体兜底。
       fontFamily: {
-        serif: ['Olivia Song', 'Playfair Display', 'Georgia', 'Songti SC', 'Noto Serif SC', 'SimSun', 'serif'],
         sans: [
-          'Olivia Song',
-          '-apple-system',
-          'BlinkMacSystemFont',
+          'Inter',
+          '"HarmonyOS Sans SC"',
           'Segoe UI Variable Text',
-          'Segoe UI',
+          'Microsoft YaHei UI',
           'PingFang SC',
-          'Microsoft YaHei',
           'system-ui',
           'sans-serif',
         ],
-        mono: ['JetBrains Mono', 'SFMono-Regular', 'ui-monospace', 'Consolas', 'monospace'],
+        // 展示文字（品牌名、留白页大标题）也用同一套：黑鱼白水这套视觉没有衬线的位置
+        serif: ['Inter', '"HarmonyOS Sans SC"', 'Georgia', 'system-ui', 'serif'],
+        // 代码与 diff 必须等宽：Inter / HarmonyOS 都没有等宽变体，
+        // 所以拉丁走 JetBrains Mono / Consolas，汉字回落到 HarmonyOS Sans SC
+        mono: [
+          'JetBrains Mono',
+          'SFMono-Regular',
+          'ui-monospace',
+          'Consolas',
+          '"HarmonyOS Sans SC"',
+          'monospace',
+        ],
       },
       borderRadius: {
         '2.5xl': '1.25rem',

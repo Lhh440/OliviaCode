@@ -1,6 +1,7 @@
 import {
   DEFAULT_UNATTENDED_POLICY,
   safeTimezone,
+  tryParseCron,
   type ScheduleRecord,
   type UnattendedMode,
   type UnattendedPolicy,
@@ -12,9 +13,12 @@ import {
  *
  * 规则：
  * - trigger 节点缺 `schedule` → 不产生排期；
+ * - cron 不合法 → **不生成计划**，原因回传给界面（画布上直接提示），
+ *   绝不让「无效：每晚 22:00」这种记录流到计划页；
+ * - 节点 id 每次重新载入画布都可能变（种子节点是新建的），所以同工作流 + 同 cron
+ *   认领已有记录，避免同一条计划被派生两遍；
  * - `enabled === false` → 保留记录但停用（历史与下次时间都还在）；
- * - 触发器从画布上删掉 → 对应记录停用并标记 orphan，账本不删（运行历史还要能看）；
- * - cron 不合法 → 记录里原样保存，由调度器在预检时拒绝并解释原因。
+ * - 触发器从画布上删掉 → 对应记录停用并标记 orphan，账本不删（运行历史还要能看）。
  */
 export interface SyncInput {
   workflow: Workflow;
@@ -25,6 +29,8 @@ export interface SyncResult {
   records: ScheduleRecord[];
   created: string[];
   disabled: string[];
+  /** 没有生成计划的原因（cron 不合法等），界面直接提示 */
+  invalid: string[];
 }
 
 function policyOf(nodePolicy: Partial<UnattendedPolicy> | undefined): UnattendedPolicy {
@@ -46,11 +52,40 @@ export function syncWorkflow(
   const records: ScheduleRecord[] = [];
   const created: string[] = [];
   const disabled: string[] = [];
+  const invalid: string[] = [];
+  const claimed = new Set<string>();
 
   for (const trigger of triggers) {
-    if (!trigger.schedule?.trim()) continue;
-    const id = scheduleIdOf(workflow.id, trigger.id);
-    const previous = existing.find((item) => item.id === id);
+    const cron = (trigger.schedule ?? '').trim();
+    if (!cron) continue;
+
+    const direct = existing.find((item) => item.id === scheduleIdOf(workflow.id, trigger.id));
+    // 节点 id 变了但触发器还是那一条：按「同工作流 + 同 cron」认领旧记录，防止派生重复
+    const adopted =
+      direct ??
+      existing.find(
+        (item) =>
+          item.workflowId === workflow.id &&
+          item.cron === cron &&
+          !claimed.has(item.id) &&
+          !records.some((record) => record.triggerNodeId === item.triggerNodeId),
+      );
+    const previous = direct ?? adopted;
+
+    const parsed = tryParseCron(cron);
+    if (!parsed.ok) {
+      invalid.push(`「${trigger.title}」的 cron 不合法（${parsed.error}），没有生成计划`);
+      if (previous) {
+        // 坏 cron 绝不允许自动跑：保留记录但强制停用，并回写原文便于修正
+        records.push({ ...previous, cron, enabled: false, updatedAt: now });
+        claimed.add(previous.id);
+        if (previous.enabled) disabled.push(previous.workflowName);
+      }
+      continue;
+    }
+
+    const id = previous?.id ?? scheduleIdOf(workflow.id, trigger.id);
+    claimed.add(id);
     // 新计划一律先暂停：无人值守必须由用户在「计划」页显式确认启用，
     // 不能因为画布上填了 cron 就默默开始定时改代码。已存在的记录由账本持有启停状态。
     const enabled = previous ? previous.enabled : false;
@@ -60,7 +95,7 @@ export function syncWorkflow(
       triggerNodeId: trigger.id,
       workflowName: workflow.name,
       workspace,
-      cron: trigger.schedule.trim(),
+      cron,
       timezone: safeTimezone(trigger.timezone),
       enabled,
       mode: previous?.mode ?? 'report',
@@ -92,7 +127,7 @@ export function syncWorkflow(
     if (index >= 0) merged[index] = record;
     else merged.push(record);
   }
-  return { records: merged, created, disabled };
+  return { records: merged, created, disabled, invalid };
 }
 
 export function validatePolicy(policy: UnattendedPolicy): string | null {

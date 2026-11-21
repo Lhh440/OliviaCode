@@ -60,6 +60,15 @@ export function renderReport(input: ReportInput): string {
   lines.push(`- 计划：\`${schedule.cron}\` · ${schedule.timezone} · 审批门 ${GATE_MODE_LABEL[schedule.policy.gate]}`);
   lines.push(`- 工作区：${run.workspace}`);
   lines.push(`- 耗时：${duration(run.startedAt, run.endedAt)}`);
+  const usage = run.usage ?? state?.usage;
+  if (usage) {
+    lines.push(
+      `- 用量：输入 ${usage.input.toLocaleString()} · 输出 ${usage.output.toLocaleString()}` +
+        `${usage.cached ? ` · 缓存 ${usage.cached.toLocaleString()}` : ''}` +
+        ` · ${usage.steps} 步` +
+        `${usage.costUsd !== undefined ? ` · 参考费用 $${usage.costUsd.toFixed(4)}` : ''}`,
+    );
+  }
   if (run.branch) lines.push(`- 结果分支：\`${run.branch}\`${run.prUrl ? '' : '（留在本地，未推送）'}`);
   if (run.prUrl) lines.push(`- Pull Request：${run.prUrl}`);
   if (run.missed && run.missed > 0) {
@@ -88,6 +97,22 @@ export function renderReport(input: ReportInput): string {
     for (const line of changed.slice(-30)) lines.push(`- ${line.text}`);
   } else {
     lines.push('- 本次没有文件写入。');
+  }
+  lines.push('');
+
+  lines.push('## 用量');
+  lines.push('');
+  if (usage) {
+    lines.push(`- 输入 token：${usage.input.toLocaleString()}`);
+    lines.push(`- 输出 token：${usage.output.toLocaleString()}`);
+    if (usage.cached) lines.push(`- 缓存命中：${usage.cached.toLocaleString()}`);
+    lines.push(`- 模型步数：${usage.steps}`);
+    lines.push(
+      `- 参考费用：${usage.costUsd !== undefined ? `$${usage.costUsd.toFixed(4)}（按当前价格表折算，非账单）` : '未配置价格，只统计 token'}`,
+    );
+    if (/token|费用/.test(run.error ?? '')) lines.push(`- 预算：${run.error}`);
+  } else {
+    lines.push('- （没有拿到用量数据）');
   }
   lines.push('');
 

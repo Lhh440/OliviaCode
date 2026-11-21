@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { nextOccurrence, tryParseCron, type McpToolResult, type RunRecord, type ScheduleRecord, type SchedulerEvent, type ToolRegistry, type WorkflowRunState } from '@olivia/core';
+import { nextOccurrence, tryParseCron, type McpToolResult, type PricingFile, type RunRecord, type ScheduleRecord, type SchedulerEvent, type ToolRegistry, type WorkflowRunState } from '@olivia/core';
 import type { SnapshotStore } from '@olivia/exec';
 import { git, isRepo, pushBranch, readStatus } from './git';
 import { createPullRequest } from './providers';
@@ -34,6 +34,8 @@ export interface SchedulerDeps {
   /** 票据解析：保险箱优先，回退环境变量；返回 null 表示没有可用凭据 */
   resolveCredentials: () => SchedulerCredentials | null;
   gitToken: (provider: 'github' | 'gitcode') => string | null;
+  /** M7：当前价格/窗口表（无人值守预算与用量展示） */
+  pricing?: () => PricingFile;
   emit: (event: SchedulerEvent) => void;
   notify?: (title: string, body: string) => void;
   now?: () => number;
@@ -104,7 +106,12 @@ export class Scheduler {
   }
 
   /** 渲染层保存画布时同步触发节点 → 账本。 */
-  async syncWorkflow(input: SyncInput): Promise<{ schedules: ScheduleRecord[]; created: string[]; disabled: string[] }> {
+  async syncWorkflow(input: SyncInput): Promise<{
+    schedules: ScheduleRecord[];
+    created: string[];
+    disabled: string[];
+    invalid: string[];
+  }> {
     const existing = await this.deps.store.listSchedules();
     const now = this.at();
     const result = syncSchedulesFromWorkflow(existing, input, now);
@@ -113,7 +120,12 @@ export class Scheduler {
     for (const record of result.records) {
       if (record.workflowId === input.workflow.id) this.deps.emit({ type: 'schedule.changed', schedule: record });
     }
-    return { schedules: result.records, created: result.created, disabled: result.disabled };
+    return {
+      schedules: result.records,
+      created: result.created,
+      disabled: result.disabled,
+      invalid: result.invalid,
+    };
   }
 
   async update(
@@ -333,6 +345,7 @@ export class Scheduler {
               ]),
             )
           : patch.nodes ?? run.nodes,
+        usage: state?.usage ?? patch.usage,
       };
       await this.deps.store.saveRuns(finished);
       const current = await this.deps.store.getSchedule(record.id);
@@ -383,7 +396,13 @@ export class Scheduler {
         snapshots: this.deps.snapshots,
         emit: () => undefined,
         signal: abort.signal,
-        budget: { maxWallMinutes: record.policy.maxWallMinutes, maxSteps: record.policy.maxSteps },
+        budget: {
+          maxWallMinutes: record.policy.maxWallMinutes,
+          maxSteps: record.policy.maxSteps,
+          maxTokens: record.policy.maxTokens,
+          maxCost: record.policy.maxCost,
+        },
+        pricing: this.deps.pricing?.(),
         gatePolicy: record.policy.gate,
         // M6：无人值守默认禁止 MCP，只有计划里逐服务器放行的才可用
         registry: this.deps.mcp?.createRegistry(),
@@ -514,6 +533,15 @@ function validatePolicyNumbers(policy: ScheduleRecord['policy']): string | null 
   }
   if (!Number.isFinite(policy.maxSteps) || policy.maxSteps < 1 || policy.maxSteps > 1000) {
     return '步数上限要在 1–1000 之间';
+  }
+  if (
+    policy.maxTokens !== undefined &&
+    (!Number.isFinite(policy.maxTokens) || policy.maxTokens < 1000 || policy.maxTokens > 100_000_000)
+  ) {
+    return 'token 上限要在 1,000–100,000,000 之间';
+  }
+  if (policy.maxCost !== undefined && (!Number.isFinite(policy.maxCost) || policy.maxCost < 0 || policy.maxCost > 10_000)) {
+    return '费用上限要在 0–10,000 美元之间（0 = 不设）';
   }
   if (policy.allowedMcpServers !== undefined && !Array.isArray(policy.allowedMcpServers)) {
     return '允许的 MCP 服务器必须是数组';

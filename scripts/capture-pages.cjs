@@ -1,13 +1,22 @@
-// 纯页面截图：不依赖模型端点。三套动态主题各一张对话，外加设置/工作流/Git/计划/扩展。
+// 纯页面截图：不依赖模型端点、不依赖主进程。
+// 黑鱼白水 / 白鱼黑水各领一半页面，检查鱼在每张版面上的位置与正文可读性。
 // 用法：node scripts/electron-run.cjs scripts/capture-pages.cjs [outDir]
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 
 const root = path.join(__dirname, '..');
-const outDir = path.resolve(process.argv[2] || path.join(root, 'docs', 'screenshots-m7'));
+const outDir = path.resolve(process.argv[2] || path.join(root, 'docs', 'screenshots-pages'));
 const indexHtml = path.join(root, 'apps', 'web', 'dist', 'index.html');
-const THEMES = ['ink-abyss', 'ink-mist', 'sakura'];
+
+/** 页面在地图上的分工：浅色偏「读」，深色偏「跑」。 */
+const PAGES = [
+  { theme: 'koi-light', hash: '/workflow', name: 'koi-light-workflow.png', settle: 2200 },
+  { theme: 'koi-light', hash: '/schedules', name: 'koi-light-schedules.png', settle: 1700 },
+  { theme: 'koi-dark', hash: '/chat', name: 'koi-dark-chat.png', settle: 2200 },
+  { theme: 'koi-dark', hash: '/extensions', name: 'koi-dark-extensions.png', settle: 2000 },
+  { theme: 'koi-dark', hash: '/git', name: 'koi-dark-git.png', settle: 1700 },
+];
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -43,23 +52,10 @@ async function shot(win, name, ms = 900) {
 
 async function open(win, theme, hash, ms = 1500) {
   await win.webContents.executeJavaScript(
-    `localStorage.setItem('olivia.theme.v3', ${JSON.stringify(theme)}); true`,
+    `localStorage.setItem('olivia.theme.v4', ${JSON.stringify(theme)}); true`,
   );
   await win.loadFile(indexHtml, { hash, query: { r: String(Date.now()) } });
   await wait(ms);
-}
-
-async function newTask(win) {
-  await win.webContents.executeJavaScript(`
-    (() => {
-      const btn =
-        document.querySelector('aside button[title="新建任务"]') ||
-        [...document.querySelectorAll('aside button')].find((b) => b.textContent.includes('新建任务'));
-      if (btn) btn.click();
-      return !!btn;
-    })()
-  `);
-  await wait(900);
 }
 
 app.whenReady().then(async () => {
@@ -69,7 +65,7 @@ app.whenReady().then(async () => {
     width: 1480,
     height: 940,
     show: false,
-    backgroundColor: '#0a0e12',
+    backgroundColor: '#f2f1ec',
     webPreferences: { contextIsolation: true, nodeIntegration: false },
   });
   win.webContents.setBackgroundThrottling(false);
@@ -80,32 +76,16 @@ app.whenReady().then(async () => {
   });
 
   try {
-    await open(win, THEMES[0], '/chat');
+    await open(win, 'koi-light', '/chat');
+    // 页面巡览从干净状态开始：清掉演示会话与工作流草稿，只留主题
     await win.webContents.executeJavaScript(
       'localStorage.removeItem("olivia.state.v1"); localStorage.removeItem("olivia.workflow.v1"); true',
     );
 
-    for (const theme of THEMES) {
-      await open(win, theme, '/chat', 2200);
-      await newTask(win);
-      await shot(win, `${theme}-welcome.png`, 1500);
-      await shot(win, `${theme}-chat.png`, 600);
+    for (const page of PAGES) {
+      await open(win, page.theme, page.hash, page.settle);
+      await shot(win, page.name, 900);
     }
-
-    await open(win, 'ink-mist', '/workflow', 2200);
-    await shot(win, 'ink-mist-workflow.png', 900);
-
-    await open(win, 'ink-abyss', '/settings', 1600);
-    await shot(win, 'ink-abyss-settings.png', 900);
-
-    await open(win, 'ink-mist', '/extensions', 1800);
-    await shot(win, 'ink-mist-extensions.png', 900);
-
-    await open(win, 'ink-abyss', '/git', 1600);
-    await shot(win, 'ink-abyss-git.png', 900);
-
-    await open(win, 'sakura', '/schedules', 1800);
-    await shot(win, 'sakura-schedules.png', 900);
   } catch (error) {
     console.error('capture failed', error);
     process.exitCode = 1;

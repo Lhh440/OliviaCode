@@ -1,4 +1,5 @@
 import type { WfNode, Workflow } from './workflow';
+import type { UsageTotals } from './usage';
 
 /**
  * 工作流运行时：主进程按 DAG 调度节点，把状态与日志流回渲染层。
@@ -29,6 +30,8 @@ export interface NodeRunState {
   worktree?: string;
   summary?: string;
   error?: string;
+  /** M7：该节点累计用量 */
+  usage?: UsageTotals;
 }
 
 export interface RunLogLine {
@@ -51,6 +54,8 @@ export interface WorkflowRunState {
   nodes: Record<string, NodeRunState>;
   logs: RunLogLine[];
   error?: string;
+  /** M7：整轮累计用量（各节点相加） */
+  usage?: UsageTotals;
 }
 
 export type WorkflowRunEvent =
@@ -58,6 +63,7 @@ export type WorkflowRunEvent =
   | { type: 'node.status'; nodeId: string; phase: RunPhase; summary?: string; error?: string }
   | { type: 'node.log'; nodeId?: string; kind: RunLogKind; text: string }
   | { type: 'gate.waiting'; nodeId: string; title: string; detail: string }
+  | { type: 'usage'; nodeId?: string; usage: UsageTotals; nodeUsage?: UsageTotals }
   | { type: 'run.done'; ok: boolean; branch?: string; error?: string };
 
 export type WorkflowGateDecision = boolean;
@@ -67,6 +73,8 @@ export interface WorkflowRunArgs {
   workflow: Workflow;
   workspace: string;
   model?: string;
+  /** M8：模型所属提供商；不填走 baseUrl/apiKey 或环境变量 */
+  providerId?: string;
   allowShell?: boolean;
   /** 设置页里填的端点与密钥，优先于环境变量 */
   baseUrl?: string;

@@ -3,6 +3,13 @@ import type { Task } from '@olivia/core';
 const now = Date.now();
 const minutes = (n: number) => now - n * 60_000;
 
+/** 首启动的示例任务：id 前缀固定，界面据此把它们单独分组、支持一键清空。 */
+export const DEMO_TASK_PREFIX = 'task_demo_';
+
+export function isDemoTask(task: Task): boolean {
+  return task.id.startsWith(DEMO_TASK_PREFIX);
+}
+
 export const seedTasks: Task[] = [
   {
     id: 'task_demo_1',
@@ -116,7 +123,7 @@ export const seedTasks: Task[] = [
     id: 'task_demo_3',
     title: '升级 Vite 到 5.4 并修告警',
     branch: 'main',
-    model: 'qwen3.8-27b',
+    model: 'qwen3-14b',
     approval: 'ask',
     status: 'done',
     at: minutes(240),

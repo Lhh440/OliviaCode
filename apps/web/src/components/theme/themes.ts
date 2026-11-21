@@ -1,180 +1,133 @@
 /**
- * M7 · 动态主题
+ * 主题：黑鱼白水 / 白鱼黑水
  *
- * 只有「背景」这一个维度：每套主题 = 一段动态影像（或一张静图）+ 一组配色。
- * 不再有亮/暗切换——整套界面固定为暗色玻璃质感，颜色随主题走。
+ * 取自一段参考影像：近乎无色的水面上，锦鲤由「字块」拼成——每一格是一个方形像素，
+ * 格子里压着随机字符，明暗靠抖动（dither）过渡；四周漂着零散的字屑，水纹是一圈圈
+ * 极淡的椭圆。整套视觉只有两件事：水的底色，和鱼的明度。
+ *
+ * 所以这里只有两套主题，互为负片：
+ *   koi-light 浅色 · 黑鱼白水 —— 纸白的水，墨黑的鱼
+ *   koi-dark  深色 · 白鱼黑水 —— 墨黑的水，骨白的鱼
+ *
+ * 强调色不再是蓝/红这类彩色，而是「墨」本身：浅色主题用近黑，深色主题用近白，
+ * 只保留一点暖赭（warm）作为刻度线、标签与代码的提示色，像影像里偶尔混进去的暖色块。
  */
 
-export type ThemeKind = 'video' | 'image';
+export type ThemeMode = 'light' | 'dark';
 
-export interface ThemePalette {
-  /** 主强调色：按钮、焦点、选中态 */
+export interface KoiPalette {
+  /** 页面底色（canvas 还没画出来时可见） */
+  bg: string;
+  /** 水面：中心与边缘 */
+  waterInner: string;
+  waterOuter: string;
+  /** 水面网格线 / 浮尘字屑 / 涟漪 */
+  grid: string;
+  dust: string;
+  ring: string;
+  /** 鱼身主色（用于图例与强调） */
+  fish: string;
+  /** 字块五级明度，索引 0 = 最靠近鱼脊 */
+  cells: [string, string, string, string, string];
+  /** 字块里的字符色 */
+  glyph: string;
+  /** 强调（按钮、链接、选中） */
   accent: string;
   accentStrong: string;
-  /** 鎏金细线、标签 */
-  gold: string;
-  /** 正文主色 */
+  onAccent: string;
+  /** 暖赭：细节、标签、代码 */
+  warm: string;
   ink: string;
-  /** 页面底色（视频加载前可见） */
-  bg: string;
+  inkMuted: string;
+  inkFaint: string;
+  line: string;
+  lineStrong: string;
+  panel: string;
+  panelStrong: string;
 }
 
 export interface ThemePreset {
-  id: string;
+  id: 'koi-light' | 'koi-dark';
   name: string;
   caption: string;
-  kind: ThemeKind;
-  /** public/backgrounds 下的文件名 */
-  file: string;
-  poster?: string;
-  position?: string;
-  /** 静图的滤镜（视频不加，避免糊掉动态） */
-  imageFilter?: string;
-  /** 遮罩浓度：越大文字越清楚、背景越退后 */
-  scrim: number;
-  /** 遮罩基色，`r,g,b` 三段，用于拼 rgba() */
-  scrimColor: string;
-  palette: ThemePalette;
+  mode: ThemeMode;
+  /** 鱼的整体明度：鱼要能看见，但不能压过正文 */
+  fishAlpha: number;
+  palette: KoiPalette;
 }
 
 export const THEMES: ThemePreset[] = [
   {
-    id: 'ink-abyss',
-    name: '临渊',
-    caption: '水墨 · 苍青 · 鹤影',
-    kind: 'video',
-    file: 'ink-abyss.mp4',
-    poster: 'ink-abyss.jpg',
-    position: 'center 44%',
-    scrim: 0.52,
-    scrimColor: '7,13,19',
+    id: 'koi-light',
+    name: '黑鱼白水',
+    caption: '纸白 · 墨鱼 · 淡墨字屑',
+    mode: 'light',
+    fishAlpha: 0.8,
     palette: {
-      accent: '#5d94b8',
-      accentStrong: '#457a9c',
-      gold: '#c9b48a',
-      ink: '#e6eef3',
-      bg: '#070c11',
+      bg: '#f2f1ec',
+      waterInner: '#fbfaf6',
+      waterOuter: '#e8e6de',
+      grid: 'rgba(20, 22, 26, 0.045)',
+      dust: 'rgba(20, 22, 26, 0.16)',
+      ring: 'rgba(20, 22, 26, 0.11)',
+      fish: '#14161a',
+      cells: ['#0d0f12', '#202329', '#3a3e45', '#6d7076', '#a8a7a1'],
+      glyph: 'rgba(250, 249, 244, 0.42)',
+      accent: '#14161a',
+      accentStrong: '#2b2e34',
+      onAccent: '#fbfaf6',
+      warm: '#a07850',
+      ink: '#14161a',
+      inkMuted: '#565a61',
+      inkFaint: '#83868d',
+      line: '#dedcd5',
+      lineStrong: '#c8c5bc',
+      panel: 'rgba(252, 251, 247, 0.72)',
+      panelStrong: 'rgba(255, 254, 250, 0.95)',
     },
   },
   {
-    id: 'ink-mist',
-    name: '烟雨',
-    caption: '水墨 · 苔青 · 檐下',
-    kind: 'video',
-    file: 'ink-mist.mp4',
-    poster: 'ink-mist.jpg',
-    position: 'center 40%',
-    scrim: 0.54,
-    scrimColor: '9,14,10',
+    id: 'koi-dark',
+    name: '白鱼黑水',
+    caption: '夜水 · 骨白鱼 · 微光字屑',
+    mode: 'dark',
+    fishAlpha: 0.62,
     palette: {
-      accent: '#6f9a78',
-      accentStrong: '#547a5e',
-      gold: '#cfc39c',
-      ink: '#e9efe5',
-      bg: '#090e0a',
-    },
-  },
-  {
-    id: 'sakura',
-    name: '花影',
-    caption: '四月 · 樱 · 墙上春色',
-    kind: 'image',
-    file: 'sakura.jpg',
-    position: 'center 42%',
-    imageFilter: 'blur(1.5px) saturate(1.02) brightness(0.62)',
-    scrim: 0.6,
-    scrimColor: '16,9,13',
-    palette: {
-      accent: '#b5617a',
-      accentStrong: '#944a61',
-      gold: '#e2c4a6',
-      ink: '#f4ecec',
-      bg: '#120c10',
-    },
-  },
-  {
-    id: 'winter-forest',
-    name: '雪林',
-    caption: '冬雾 · 松影',
-    kind: 'video',
-    file: 'winter-forest.mp4',
-    poster: 'winter-forest.jpg',
-    position: 'center',
-    scrim: 0.56,
-    scrimColor: '10,12,15',
-    palette: {
-      accent: '#7b9fb5',
-      accentStrong: '#5a7e96',
-      gold: '#c4d1db',
-      ink: '#eef3f6',
-      bg: '#0a0c0f',
-    },
-  },
-  {
-    id: 'chibi',
-    name: '初音',
-    caption: '天蓝 · 跃动',
-    kind: 'video',
-    file: 'chibi.mp4',
-    poster: 'chibi.jpg',
-    position: 'center top',
-    scrim: 0.48,
-    scrimColor: '14,18,20',
-    palette: {
-      accent: '#39c5bb',
-      accentStrong: '#2a9d96',
-      gold: '#e8ba5c',
-      ink: '#e8f4f3',
-      bg: '#0e1214',
-    },
-  },
-  {
-    id: 'winter-sunrise',
-    name: '海螺街',
-    caption: '天光 · 冬晓',
-    kind: 'video',
-    file: 'winter-sunrise.mp4',
-    poster: 'winter-sunrise.jpg',
-    position: 'center',
-    scrim: 0.54,
-    scrimColor: '12,16,19',
-    palette: {
-      accent: '#6a9bc7',
-      accentStrong: '#4f7ba3',
-      gold: '#d4c4a8',
-      ink: '#ecf1f5',
-      bg: '#0c1013',
-    },
-  },
-  {
-    id: 'gojo',
-    name: '无下限',
-    caption: '六眼 · 领域',
-    kind: 'video',
-    file: 'gojo.mp4',
-    poster: 'gojo.jpg',
-    position: 'center top',
-    scrim: 0.62,
-    scrimColor: '8,10,13',
-    palette: {
-      accent: '#4ca9d1',
-      accentStrong: '#3685aa',
-      gold: '#c9b9d4',
-      ink: '#e8f0f5',
-      bg: '#08090d',
+      bg: '#08090a',
+      waterInner: '#121417',
+      waterOuter: '#050607',
+      grid: 'rgba(242, 241, 236, 0.05)',
+      dust: 'rgba(242, 241, 236, 0.2)',
+      ring: 'rgba(242, 241, 236, 0.12)',
+      fish: '#f2f1ec',
+      cells: ['#faf9f4', '#d9d8d1', '#a9a8a2', '#6b6d72', '#3a3d42'],
+      glyph: 'rgba(8, 9, 10, 0.46)',
+      accent: '#f2f1ec',
+      accentStrong: '#d8d7d0',
+      onAccent: '#0a0b0c',
+      warm: '#c9a887',
+      ink: '#f2f1ec',
+      inkMuted: '#a5a6a4',
+      inkFaint: '#7a7c80',
+      line: '#232529',
+      lineStrong: '#33363b',
+      panel: 'rgba(12, 13, 15, 0.74)',
+      panelStrong: 'rgba(15, 16, 18, 0.94)',
     },
   },
 ];
 
-export const DEFAULT_THEME_ID = 'ink-abyss';
+export const DEFAULT_THEME_ID = 'koi-light';
+
+/** 旧版本（视频/静图主题）的 id 已经不存在，统一迁移到最接近的深色。 */
+export function migrateThemeId(stored: string | null | undefined): string {
+  if (!stored) return DEFAULT_THEME_ID;
+  if (THEMES.some((item) => item.id === stored)) return stored;
+  return 'koi-dark';
+}
 
 export function themeById(id: string | null | undefined): ThemePreset {
   return THEMES.find((item) => item.id === id) ?? THEMES[0]!;
-}
-
-/** 背景资源地址：兼容 dev 的 `/` 与打包后的 `./`。 */
-export function themeAsset(file: string): string {
-  return `${import.meta.env.BASE_URL}backgrounds/${file}`;
 }
 
 /** `#6ea6c9` → `110,166,201`，给 canvas / rgba 用。 */

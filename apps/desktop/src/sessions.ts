@@ -24,4 +24,12 @@ export class SessionStore {
       return [];
     }
   }
+
+  /** 清理记忆时给所有已有日志打一条 cleared，避免重建时把旧记忆又捞回来。 */
+  async taskIds(): Promise<string[]> {
+    const names = await fs.readdir(this.dir).catch(() => [] as string[]);
+    return names
+      .filter((name) => name.endsWith('.jsonl'))
+      .map((name) => name.slice(0, -'.jsonl'.length));
+  }
 }
